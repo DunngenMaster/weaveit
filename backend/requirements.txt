@@ -1,0 +1,9 @@
+fastapi
+uvicorn[standard]
+pydantic
+pydantic-settings
+redis
+weaviate-client
+google-generativeai
+python-dotenv
+httpx
