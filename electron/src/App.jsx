@@ -32,7 +32,7 @@ export default function App() {
     const looksLikeDomain = /\.[a-z]{2,}$/i.test(trimmed);
     const isSearch = !hasProtocol && !looksLikeDomain;
     const nextUrl = isSearch
-      ? `https://www.google.com/search?q=${encodeURIComponent(trimmed)}`
+      ? `https://duckduckgo.com/?q=${encodeURIComponent(trimmed)}`
       : hasProtocol
         ? trimmed
         : `https://${trimmed}`;
@@ -42,6 +42,7 @@ export default function App() {
         tab.id === activeTabId ? { ...tab, url: nextUrl } : tab
       )
     );
+    getActiveWebview()?.loadURL(nextUrl);
   };
 
   const statusText = useMemo(() => {
@@ -121,6 +122,7 @@ export default function App() {
     setActiveUrl(tab.url);
     setUrl(tab.url);
     setPageTitle(tab.title || "Ghost Browser");
+    webviewMapRef.current.get(tabId)?.loadURL(tab.url);
   };
 
   const closeTab = (tabId) => {
