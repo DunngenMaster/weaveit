@@ -4,7 +4,12 @@ const DEFAULT_URL = "https://example.com";
 
 export default function App() {
   const [tabs, setTabs] = useState([
-    { id: crypto.randomUUID(), url: DEFAULT_URL, title: "New Tab" },
+    {
+      id: crypto.randomUUID(),
+      url: DEFAULT_URL,
+      title: "New Tab",
+      favicon: "",
+    },
   ]);
   const [activeTabId, setActiveTabId] = useState(tabs[0].id);
   const [url, setUrl] = useState(DEFAULT_URL);
@@ -72,9 +77,20 @@ export default function App() {
       }
     };
 
+    const handleFavicon = (event) => {
+      const iconUrl = event?.favicons?.[0];
+      if (!iconUrl) return;
+      setTabs((prev) =>
+        prev.map((tab) =>
+          tab.id === tabId ? { ...tab, favicon: iconUrl } : tab
+        )
+      );
+    };
+
     webview.addEventListener("did-navigate", handleNavigate);
     webview.addEventListener("did-navigate-in-page", handleNavigate);
     webview.addEventListener("page-title-updated", handleTitle);
+    webview.addEventListener("page-favicon-updated", handleFavicon);
   };
 
   const setWebviewRef = (tabId) => (node) => {
@@ -90,7 +106,7 @@ export default function App() {
 
   const addTab = () => {
     const id = crypto.randomUUID();
-    const newTab = { id, url: DEFAULT_URL, title: "New Tab" };
+    const newTab = { id, url: DEFAULT_URL, title: "New Tab", favicon: "" };
     setTabs((prev) => [...prev, newTab]);
     setActiveTabId(id);
     setActiveUrl(DEFAULT_URL);
@@ -105,6 +121,33 @@ export default function App() {
     setActiveUrl(tab.url);
     setUrl(tab.url);
     setPageTitle(tab.title || "Ghost Browser");
+  };
+
+  const closeTab = (tabId) => {
+    setTabs((prev) => {
+      const nextTabs = prev.filter((tab) => tab.id !== tabId);
+      if (nextTabs.length === 0) {
+        const id = crypto.randomUUID();
+        return [{ id, url: DEFAULT_URL, title: "New Tab", favicon: "" }];
+      }
+      return nextTabs;
+    });
+
+    if (tabId === activeTabId) {
+      const remaining = tabs.filter((tab) => tab.id !== tabId);
+      const nextActive = remaining[0];
+      if (nextActive) {
+        setActiveTabId(nextActive.id);
+        setActiveUrl(nextActive.url);
+        setUrl(nextActive.url);
+        setPageTitle(nextActive.title || "Ghost Browser");
+      } else {
+        setActiveTabId("");
+        setActiveUrl(DEFAULT_URL);
+        setUrl(DEFAULT_URL);
+        setPageTitle("Ghost Browser");
+      }
+    }
   };
 
   const onBack = () => {
@@ -171,8 +214,22 @@ export default function App() {
             type="button"
             onClick={() => switchTab(tab.id)}
           >
-            <span className="tab__favicon" />
+            {tab.favicon ? (
+              <img className="tab__favicon" src={tab.favicon} alt="" />
+            ) : (
+              <span className="tab__favicon" />
+            )}
             <span className="tab__title">{tab.title || "New Tab"}</span>
+            <span
+              className="tab__close"
+              onClick={(event) => {
+                event.stopPropagation();
+                closeTab(tab.id);
+              }}
+              role="button"
+            >
+              ×
+            </span>
           </button>
         ))}
         <button className="tab tab--new" type="button" onClick={addTab}>

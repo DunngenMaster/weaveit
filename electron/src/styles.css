@@ -86,7 +86,7 @@ body {
   align-items: center;
   gap: 8px;
   height: 28px;
-  padding: 0 12px;
+  padding: 0 10px;
   border-radius: 8px 8px 0 0;
   background: #e9edf2;
   border: 1px solid #d6dbe2;
@@ -120,6 +120,14 @@ body {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.tab__close {
+  margin-left: 4px;
+  font-size: 14px;
+  color: #6b7280;
+  cursor: pointer;
+  line-height: 1;
 }
 
 .toolbar {
