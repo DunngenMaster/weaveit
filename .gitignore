@@ -79,3 +79,5 @@ yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
 electron/.vite/
+electron/node_modules/
+electron/node_modules/
