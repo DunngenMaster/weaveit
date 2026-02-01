@@ -12,6 +12,7 @@ class Settings(BaseSettings):
     weaviate_api_key: str = ""
     gemini_api_key: str = ""
     gemini_model: str = "gemini-1.5-flash"
+    browserbase_api_key: str = ""
     
     class Config:
         env_file = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), ".env")
