@@ -14,7 +14,7 @@ class BrowserbaseClient:
     def _get_headers(self) -> dict:
         """Get request headers with API key"""
         return {
-            "x-bb-api-key": self.api_key,
+            "Authorization": f"Bearer {self.api_key}",
             "Content-Type": "application/json"
         }
     
