@@ -14,6 +14,12 @@ from app.utils.fingerprint import compute_fingerprint as compute_fp
 from app.services.safety_gate import safety_gate
 from app.services.critic import critic
 from app.services.reward import reward_resolver
+from app.services.handoff_detector import handoff_detector  # Sprint 18.5
+from app.services.csa_builder import csa_builder  # Sprint 18
+from app.services.csa_store import csa_store  # Sprint 18
+
+# Sprint 15: New imports for Redis Streams
+USE_STREAMS = True  # Feature flag for gradual rollout
 
 
 router = APIRouter(prefix="/v1/events")
@@ -113,12 +119,41 @@ async def ingest_events(batch: EventBatch):
                     client.incr(counter_key)
                     client.expire(counter_key, 7 * 24 * 60 * 60)  # 7 days TTL
                     
+                    # Story 18.8: Mark blocked content for CSA generation
+                    blocked_flag = f"safety:blocked:{canonical.user_id}:recent"
+                    client.setex(blocked_flag, 60 * 60, "true")  # 1 hour TTL
+                    
                     # DO NOT add to canonical_events (no storage)
                     continue
                 
                 # Compute fingerprint
                 fingerprint = compute_fp(text)
                 canonical.payload["fingerprint"] = fingerprint
+                
+                # Story 18.5: Check if handoff is needed
+                provider = canonical.provider
+                handoff_needed = handoff_detector.check_handoff_needed(
+                    user_id=canonical.user_id,
+                    current_provider=provider,
+                    text=text,
+                    fingerprint=fingerprint
+                )
+                
+                # If handoff is needed, trigger CSA generation in background
+                if handoff_needed and not handoff_detector.is_handoff_pending(canonical.user_id):
+                    print(f"[HANDOFF] Triggering CSA generation for user {canonical.user_id}")
+                    # Generate CSA asynchronously (don't block event ingestion)
+                    try:
+                        csa = await csa_builder.build_csa(
+                            user_id=canonical.user_id,
+                            source_provider=provider,
+                            source_session_id=canonical.session_id,
+                            domain="unknown"
+                        )
+                        csa_store.save_csa(csa, save_markdown=True)
+                        print(f"[HANDOFF] CSA {csa.csa_id} created and saved")
+                    except Exception as e:
+                        print(f"[HANDOFF] Error generating CSA: {e}")
                 
                 # Get or create attempt thread
                 attempt_thread_id, attempt_count = attempt_thread_manager.get_or_create_thread(
@@ -239,7 +274,23 @@ async def ingest_events(batch: EventBatch):
         
         # Second pass: store canonical events (only if allowed)
         for canonical in canonical_events:
-            # Store in Redis events list per user+provider
+            # Sprint 15.1: Write to Redis Streams (replayable, ordered)
+            if USE_STREAMS:
+                stream_key = f"stream:events:{canonical.user_id}"
+                
+                # Prepare event data for stream
+                stream_data = canonical.model_dump()
+                # Convert payload dict to JSON string for stream storage
+                stream_data['payload'] = json.dumps(stream_data['payload'])
+                
+                # XADD stream:events:{user_id} * <fields>
+                try:
+                    message_id = client.xadd(stream_key, stream_data, maxlen=1000)
+                    print(f"[STREAM] Added event {canonical.event_id[:8]}... to stream {message_id}")
+                except Exception as e:
+                    print(f"[STREAM] Error writing to stream: {e}")
+            
+            # Keep LPUSH for backward compatibility and debugging
             events_key = f"events:{canonical.user_id}:{canonical.provider}"
             canonical_json = canonical.model_dump_json()
             client.lpush(events_key, canonical_json)

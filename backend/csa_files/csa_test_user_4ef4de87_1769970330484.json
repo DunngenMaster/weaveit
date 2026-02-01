@@ -1,0 +1,46 @@
+{
+  "csa_id": "b445229a-7e04-43c9-aff1-49c78c20f457",
+  "schema_version": 1,
+  "user_id": "test_user_4ef4de87",
+  "created_ts_ms": 1769970330484,
+  "source_provider": "chatgpt",
+  "source_session_id": "test_session_123",
+  "title": "Flight booking and London hotel recommendations",
+  "user_intent": "Book a flight and explore hotel options for a trip to London.",
+  "what_we_did": [
+    "Confirmed and booked a flight from JFK to LHR for October 15th to October 22nd.",
+    "Provided two boutique hotel recommendations in London's West End within the specified budget.",
+    "Offered detailed information for 'The Z Hotel Piccadilly'."
+  ],
+  "what_worked": [
+    "Successfully identified and booked the desired flight based on user's criteria.",
+    "Found hotel options that matched user's style (boutique), location (West End), and budget preferences."
+  ],
+  "what_failed": [],
+  "constraints": [
+    "Flight: New York (JFK) to London (LHR), October 15th - October 22nd.",
+    "Hotel: Boutique style, £150-£200 per night, close to West End."
+  ],
+  "preferences": [
+    "Hotel: Boutique style."
+  ],
+  "key_entities": {
+    "flight_origin": "JFK",
+    "flight_destination": "LHR",
+    "flight_departure_date": "October 15",
+    "flight_return_date": "October 22",
+    "hotel_location": "London West End",
+    "hotel_budget_min": "£150",
+    "hotel_budget_max": "£200",
+    "booked_flight_ref": "BA12345"
+  },
+  "artifacts": [],
+  "next_steps": [
+    "User to decide on hotel booking for London trip."
+  ],
+  "instructions_for_next_model": [
+    "Follow up with the user regarding their hotel decision for the London trip.",
+    "Be prepared to book 'The Z Hotel Piccadilly' or 'Hotel Indigo London - Leicester Square' if requested.",
+    "Offer to search for alternative hotel options if the current recommendations are not suitable."
+  ]
+}
