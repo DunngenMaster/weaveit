@@ -8,6 +8,7 @@ Backend-only, no frontend required.
 from typing import Literal
 from datetime import datetime, timedelta
 from pydantic import BaseModel
+from dashboard.publisher import dashboard
 
 
 OutcomeType = Literal["success", "fail", "unknown"]
@@ -71,11 +72,19 @@ def compute_reward(
     # Rule 1: Positive signals (highest priority)
     for signal in POSITIVE_SIGNALS:
         if signal in message_lower:
-            return RewardResult(
+            result = RewardResult(
                 reward=0.7,
                 outcome="success",
                 reason=f"positive_signal:{signal}"
             )
+            dashboard.publish_sync("reward_update", {
+                "reward": result.reward,
+                "outcome": result.outcome,
+                "reason": result.reason,
+                "run_id": "auto",
+                "total_rewards": 0.7
+            })
+            return result
     
     # Rule 2: Negative signals
     for signal in NEGATIVE_SIGNALS:

@@ -13,6 +13,7 @@ from typing import Dict, Any
 from app.services.gemini_client import gemini_client
 from app.services.redis_client import redis_client
 from app.schemas.csa import ConversationSnapshotArtifact
+from dashboard.publisher import dashboard
 
 
 CSA_BUILDER_PROMPT = """Create a Conversation Snapshot for AI handoff.
@@ -81,6 +82,16 @@ class CSABuilder:
             )
             
             print(f"[CSA_BUILDER] Built CSA: {csa.csa_id}")
+            
+            # Publish to live dashboard
+            dashboard.publish_sync("csa_created", {
+                "csa_id": csa.csa_id,
+                "title": csa.title,
+                "user_id": user_id,
+                "source_provider": source_provider,
+                "trigger": "auto"
+            })
+            
             return csa
             
         except Exception as e:

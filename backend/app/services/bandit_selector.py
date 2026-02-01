@@ -8,6 +8,7 @@ Uses UCB1 algorithm for exploration-exploitation balance.
 import math
 from typing import Literal, Dict, Tuple, Optional
 from app.services.redis_client import redis_client
+from dashboard.publisher import dashboard
 
 
 # Fixed strategy set (no runtime choices)
@@ -160,6 +161,14 @@ class BanditSelector:
         
         print(f"[BANDIT] Selected {selected} for {domain} (scores: {scores})")
         
+        # Publish to live dashboard
+        dashboard.publish_sync("bandit_selection", {
+            "strategy": selected,
+            "domain": domain,
+            "user_id": user_id,
+            "ucb_scores": {k: round(v, 3) if v != float('inf') else 999.0 for k, v in scores.items()}
+        })
+        
         return selected, scores
     
     def record_shown(self, user_id: str, domain: str, strategy: str):
@@ -198,9 +207,19 @@ class BanditSelector:
         """
         if outcome == "success":
             wins_key = self._get_wins_key(user_id, domain, strategy)
-            self.client.incr(wins_key)
+            new_wins = self.client.incr(wins_key)
             self.client.expire(wins_key, self.ttl_seconds)
             print(f"[BANDIT] Strategy {strategy} won for {domain}")
+            
+            # Publish to live dashboard
+            dashboard.publish_sync("reward_update", {
+                "strategy": strategy,
+                "domain": domain,
+                "user_id": user_id,
+                "reward": 1,
+                "total_rewards": new_wins,
+                "outcome": outcome
+            })
     
     def get_all_stats(self, user_id: str, domain: str) -> Dict[str, Dict[str, int]]:
         """
