@@ -4,6 +4,7 @@ from uuid import uuid4
 import json
 from app.schemas.runs import RunStartRequest, RunStartResponse, LearnedResponse, RunDetailsResponse
 from app.services.redis_client import redis_client
+from app.services.weaviate_client import weaviate_client
 from app.agent.orchestrator import run_agent
 
 
@@ -45,8 +46,41 @@ async def start_run(request: RunStartRequest, background_tasks: BackgroundTasks)
         policy = {
             "max_tabs": "11",
             "min_score": "0.55",
-            "unique_domains": "1"
+            "unique_domains": "1",
+            "max_time_ms": "120000"
         }
+        prompt_delta = {}
+        patch_key = f"tab:{request.tab_id}:patch"
+        patch_data = client.hgetall(patch_key) or {}
+        if patch_data.get("patch"):
+            try:
+                patch = json.loads(patch_data.get("patch", "{}"))
+                policy_delta = patch.get("policy_delta", {}) or {}
+                prompt_delta = patch.get("prompt_delta", {}) or {}
+                for key, value in policy_delta.items():
+                    if value is None:
+                        continue
+                    if key in policy:
+                        policy[key] = str(value)
+            except Exception:
+                pass
+        else:
+            try:
+                memories = weaviate_client.search_run_memory(
+                    f"{request.goal} {request.query}",
+                    limit=1
+                )
+                if memories:
+                    mem = memories[0]
+                    policy_json = mem.get("policy_json") or "{}"
+                    prompt_json = mem.get("prompt_delta_json") or "{}"
+                    policy_from_mem = json.loads(policy_json)
+                    prompt_delta = json.loads(prompt_json)
+                    for key, value in policy_from_mem.items():
+                        if key in policy and value is not None:
+                            policy[key] = str(value)
+            except Exception:
+                pass
         policy_key = f"run:{run_id}:policy"
         client.hset(policy_key, mapping=policy)
         client.expire(policy_key, 86400)
@@ -54,6 +88,11 @@ async def start_run(request: RunStartRequest, background_tasks: BackgroundTasks)
         tab_policy_key = f"tab:{request.tab_id}:policy"
         client.hset(tab_policy_key, mapping=policy)
         client.expire(tab_policy_key, 86400)
+
+        client.hset(run_key, mapping={
+            "policy_json": json.dumps(policy),
+            "prompt_delta": json.dumps(prompt_delta)
+        })
         
         tab_runs_key = f"tab:{request.tab_id}:runs"
         client.rpush(tab_runs_key, run_id)
@@ -69,7 +108,9 @@ async def start_run(request: RunStartRequest, background_tasks: BackgroundTasks)
             "last_status": "started",
             "policy_max_tabs": policy["max_tabs"],
             "policy_min_score": policy["min_score"],
-            "policy_unique_domains": policy["unique_domains"]
+            "policy_unique_domains": policy["unique_domains"],
+            "policy_max_time_ms": policy["max_time_ms"],
+            "prompt_delta": json.dumps(prompt_delta)
         })
         client.expire(prefs_key, 86400)
         
@@ -80,7 +121,9 @@ async def start_run(request: RunStartRequest, background_tasks: BackgroundTasks)
             request.query,
             request.limit,
             request.tab_id,
-            request.url
+            request.url,
+            policy,
+            prompt_delta
         )
         
         return RunStartResponse(run_id=run_id, status="started")
@@ -142,6 +185,11 @@ async def get_run_details(run_id: str):
         trace = []
         extracted = []
         candidates = []
+        summary = {}
+        patch = {}
+        applied_policy = {}
+        applied_prompt_delta = {}
+        metrics = {}
         if data.get("plan"):
             try:
                 plan = json.loads(data.get("plan", "{}"))
@@ -162,17 +210,52 @@ async def get_run_details(run_id: str):
                 candidates = json.loads(data.get("candidates", "[]"))
             except Exception:
                 candidates = []
+        if data.get("summary"):
+            try:
+                summary = json.loads(data.get("summary", "{}"))
+            except Exception:
+                summary = {}
+        if data.get("metrics"):
+            try:
+                metrics = json.loads(data.get("metrics", "{}"))
+            except Exception:
+                metrics = {}
+        patch_key = f"run:{run_id}:patch"
+        patch_data = client.hgetall(patch_key) or {}
+        if patch_data.get("patch"):
+            try:
+                patch = json.loads(patch_data.get("patch", "{}"))
+            except Exception:
+                patch = {}
+        if data.get("policy_json"):
+            try:
+                applied_policy = json.loads(data.get("policy_json", "{}"))
+            except Exception:
+                applied_policy = {}
+        if data.get("prompt_delta"):
+            try:
+                applied_prompt_delta = json.loads(data.get("prompt_delta", "{}"))
+            except Exception:
+                applied_prompt_delta = {}
         
         return RunDetailsResponse(
             run_id=run_id,
             status=data.get("status", "unknown"),
+            status_reason=data.get("status_reason") or None,
             goal=data.get("goal"),
             query=data.get("query"),
             error=data.get("error"),
             plan=plan or {},
             candidates=candidates or [],
             extracted=extracted or [],
-            trace=trace or []
+            trace=trace or [],
+            connect_url=data.get("connect_url") or None,
+            live_view_url=data.get("live_view_url") or None,
+            summary=summary or {},
+            patch=patch or {},
+            applied_policy=applied_policy or {},
+            applied_prompt_delta=applied_prompt_delta or {},
+            metrics=metrics or {}
         )
     
     except HTTPException:

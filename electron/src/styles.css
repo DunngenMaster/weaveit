@@ -501,6 +501,72 @@ body {
   word-break: break-word;
 }
 
+.run-details__live {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.run-details__iframe {
+  width: 100%;
+  height: 180px;
+  border-radius: 8px;
+  border: 1px solid #e2e8f0;
+  background: #ffffff;
+}
+
+.run-details__button {
+  align-self: flex-start;
+  height: 28px;
+  padding: 0 10px;
+  border-radius: 6px;
+  border: 1px solid #c7cdd6;
+  background: #ffffff;
+  color: #111827;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.feedback-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+
+.chip {
+  border: 1px solid #c7cdd6;
+  background: #ffffff;
+  color: #111827;
+  padding: 4px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.chip--active {
+  background: #111827;
+  color: #ffffff;
+  border-color: #111827;
+}
+
+.feedback-notes {
+  width: 100%;
+  min-height: 70px;
+  border-radius: 8px;
+  border: 1px solid #c7cdd6;
+  padding: 8px;
+  font-size: 12px;
+  resize: vertical;
+  margin-bottom: 8px;
+}
+
+.feedback-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
 @media (max-width: 960px) {
   .viewport {
     grid-template-columns: 1fr;

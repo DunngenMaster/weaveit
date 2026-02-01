@@ -78,7 +78,6 @@ class WeaviateClient:
                         wvc.config.Property(name="created_at", data_type=wvc.config.DataType.DATE),
                     ]
                 )
-            
             # Sprint 17.6: SkillMemory collection with quality scoring
             if not self.client.collections.exists("SkillMemory"):
                 self.client.collections.create(
@@ -97,7 +96,7 @@ class WeaviateClient:
                         wvc.config.Property(name="created_at", data_type=wvc.config.DataType.DATE),
                     ]
                 )
-            
+
             # Sprint 17.9: ArtifactSummary collection for clean browsing data
             if not self.client.collections.exists("ArtifactSummary"):
                 self.client.collections.create(
@@ -116,7 +115,23 @@ class WeaviateClient:
                         wvc.config.Property(name="created_at", data_type=wvc.config.DataType.DATE),
                     ]
                 )
-            
+
+            # Run-level memory collection for agent orchestration
+            if not self.client.collections.exists("RunMemory"):
+                self.client.collections.create(
+                    name="RunMemory",
+                    properties=[
+                        wvc.config.Property(name="run_id", data_type=wvc.config.DataType.TEXT),
+                        wvc.config.Property(name="goal", data_type=wvc.config.DataType.TEXT),
+                        wvc.config.Property(name="query", data_type=wvc.config.DataType.TEXT),
+                        wvc.config.Property(name="summary_text", data_type=wvc.config.DataType.TEXT),
+                        wvc.config.Property(name="policy_json", data_type=wvc.config.DataType.TEXT),
+                        wvc.config.Property(name="prompt_delta_json", data_type=wvc.config.DataType.TEXT),
+                        wvc.config.Property(name="patch_json", data_type=wvc.config.DataType.TEXT),
+                        wvc.config.Property(name="metrics_json", data_type=wvc.config.DataType.TEXT),
+                        wvc.config.Property(name="created_at", data_type=wvc.config.DataType.DATE),
+                    ]
+                )
             return True
         except Exception as e:
             print(f"Error creating schema: {e}")
@@ -125,6 +140,26 @@ class WeaviateClient:
     def close(self):
         if self._client:
             self._client.close()
+
+    def search_run_memory(self, text: str, limit: int = 3) -> list[dict]:
+        try:
+            if not self.client.is_ready():
+                return []
+            if not self.client.collections.exists("RunMemory"):
+                return []
+            collection = self.client.collections.get("RunMemory")
+            results = collection.query.bm25(
+                query=text,
+                limit=limit
+            )
+            items = []
+            for obj in results.objects:
+                props = obj.properties or {}
+                items.append(props)
+            return items
+        except Exception as e:
+            print(f"Error searching RunMemory: {e}")
+            return []
 
 
 weaviate_client = WeaviateClient()

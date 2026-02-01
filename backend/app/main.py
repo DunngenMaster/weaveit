@@ -1,8 +1,21 @@
+import asyncio
+from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from contextlib import asynccontextmanager
-import asyncio
-from app.api.routes import health, events, context, memory, browser, demo, runs, feedback, debug, eval, audit
+from app.api.routes import (
+    health,
+    events,
+    context,
+    memory,
+    browser,
+    demo,
+    runs,
+    feedback,
+    debug,
+    eval,
+    audit,
+    run_events,
+)
 from app.api.routes import handoff  # Sprint 18
 from app.services.redis_client import redis_client
 from app.services.weaviate_client import weaviate_client
@@ -76,6 +89,7 @@ app.include_router(debug.router, tags=["Debug"])  # Sprint 15.6
 app.include_router(eval.router, tags=["Eval"])  # Sprint 16.5 & 16.6
 app.include_router(audit.router, tags=["Audit"])  # Sprint 17.10
 app.include_router(handoff.router, tags=["Handoff"])  # Sprint 18: CSA
+app.include_router(run_events.router, tags=["Run Events"])
 
 
 if __name__ == "__main__":
