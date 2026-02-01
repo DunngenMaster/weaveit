@@ -7,4 +7,7 @@ weaviate-client
 google-generativeai
 python-dotenv
 httpx
+langchain
+langgraph
+langchain-google-genai
 playwright
