@@ -5,7 +5,6 @@ class JobToContextRequest(BaseModel):
     """Request for POST /v1/demo/job_to_context"""
     
     user_id: str = Field(..., description="User identifier")
-    browserbase_session_id: str = Field(..., description="Browserbase session ID")
     job_url: str = Field(..., description="Job posting URL")
     provider: str = Field(..., description="AI provider (chatgpt, claude, gemini)")
 

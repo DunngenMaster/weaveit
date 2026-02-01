@@ -20,7 +20,6 @@ class ExtractJobRequest(BaseModel):
     """Request for POST /v1/browser/extract/job"""
     
     user_id: str = Field(..., description="User identifier")
-    browserbase_session_id: str = Field(..., description="Browserbase session ID")
     url: str = Field(..., description="Job posting URL")
 
 
