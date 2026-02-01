@@ -2,6 +2,7 @@ from fastapi import APIRouter, Query
 from app.schemas.context import ContextResponse
 from app.services.redis_client import redis_client
 from app.services.weaviate_client import weaviate_client
+from app.services.bandit_selector import STRATEGY_INSTRUCTIONS
 import weaviate.classes as wvc
 import json
 from datetime import datetime
@@ -14,7 +15,8 @@ def build_context_block(
     active_goal: str,
     summaries: list[str],
     next_steps: list[str],
-    memories: list[dict]
+    memories: list[dict],
+    selected_strategy: str = None
 ) -> str:
     """Build formatted context block for injection into provider"""
     
@@ -36,6 +38,14 @@ def build_context_block(
     else:
         lines.append("  None set")
     lines.append("")
+    
+    # SELECTED_STRATEGY section (from bandit learning)
+    if selected_strategy and selected_strategy in STRATEGY_INSTRUCTIONS:
+        lines.append("SELECTED_STRATEGY:")
+        strategy_text = STRATEGY_INSTRUCTIONS[selected_strategy]
+        for line in strategy_text.split('\n'):
+            lines.append(f"  {line}")
+        lines.append("")
     
     # WHAT_WE_DID section (from summaries)
     lines.append("WHAT_WE_DID:")
@@ -183,12 +193,29 @@ async def get_context(
         next_steps = []
         # TODO: Could extract from last extraction result if we store it
         
-        # Build context block
+        # Get selected strategy from recent events (last 5 events)
+        selected_strategy = None
+        events_key = f"events:{user_id}:{provider}"
+        if client.exists(events_key):
+            recent_events = client.lrange(events_key, 0, 4)  # Last 5 events
+            for event_json in recent_events:
+                try:
+                    event_str = event_json.decode() if isinstance(event_json, bytes) else event_json
+                    event = json.loads(event_str)
+                    payload = event.get('payload', {})
+                    if 'selected_strategy' in payload:
+                        selected_strategy = payload['selected_strategy']
+                        break  # Use most recent strategy
+                except:
+                    continue
+        
+        # Build context block with strategy injection
         context_block = build_context_block(
             active_goal=active_goal,
             summaries=summaries,
             next_steps=next_steps,
-            memories=memories
+            memories=memories,
+            selected_strategy=selected_strategy
         )
         
         # Store as last_good_context (24h TTL)

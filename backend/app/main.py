@@ -1,20 +1,47 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
+import asyncio
 from app.api.routes import health, events, context, memory, browser, demo, runs, feedback, debug, eval, audit
 from app.api.routes import handoff  # Sprint 18
 from app.services.redis_client import redis_client
 from app.services.weaviate_client import weaviate_client
 from app.services.db_client import db_client
+from app.services.stream_consumer import stream_consumer
+
+
+# Track active users for stream consumer (in production, discover from Redis keys)
+ACTIVE_USER_IDS = ["default_user", "test_user"]  # TODO: Auto-discover from session:* keys
+
+consumer_task = None
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    global consumer_task
+    
     print("WeaveIt API starting up...")
     db_client.connect()
     weaviate_client.create_schema()
+    
+    # Start stream consumer in background
+    print("[STARTUP] Starting stream consumer...")
+    consumer_task = asyncio.create_task(stream_consumer.run_forever(ACTIVE_USER_IDS))
+    
     yield
+    
     print("Shutting down...")
+    
+    # Stop stream consumer
+    if consumer_task:
+        print("[SHUTDOWN] Stopping stream consumer...")
+        stream_consumer.stop()
+        try:
+            await asyncio.wait_for(consumer_task, timeout=5.0)
+        except asyncio.TimeoutError:
+            print("[SHUTDOWN] Consumer did not stop gracefully, cancelling...")
+            consumer_task.cancel()
+    
     redis_client.close()
     weaviate_client.close()
     db_client.close()

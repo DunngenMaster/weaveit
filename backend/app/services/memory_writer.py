@@ -1,5 +1,6 @@
 from typing import Dict, List, Any
 from app.services.gemini_client import gemini_client
+from dashboard.publisher import dashboard
 
 
 MEMORY_EXTRACTION_PROMPT = """You are a memory extraction assistant. Analyze the conversation and extract structured information.
@@ -73,6 +74,15 @@ class MemoryWriter:
             result["candidates"] = []
         if "safety" not in result:
             result["safety"] = {"store_allowed": True, "reason": "No issues detected"}
+        
+        # Publish memory candidates to dashboard
+        for candidate in result.get("candidates", []):
+            dashboard.publish_sync("memory_write", {
+                "kind": candidate.get("kind", "UNKNOWN"),
+                "key": candidate.get("key", ""),
+                "confidence": candidate.get("confidence", 0.0),
+                "text_preview": candidate.get("text", "")[:50]
+            })
         
         return result
 
