@@ -1,6 +1,7 @@
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
-from app.api.routes import health, events, context, memory, browser, demo
+from app.api.routes import health, events, context, memory, browser, demo, runs, feedback
 from app.services.redis_client import redis_client
 from app.services.weaviate_client import weaviate_client
 from app.services.db_client import db_client
@@ -25,6 +26,15 @@ app = FastAPI(
     lifespan=lifespan
 )
 
+# Dev CORS for local Electron/Vite
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"]
+)
+
 # Include routers
 app.include_router(health.router, tags=["Health"])
 app.include_router(events.router, tags=["Events"])
@@ -32,6 +42,8 @@ app.include_router(context.router, tags=["Context"])
 app.include_router(memory.router, tags=["Memory"])
 app.include_router(browser.router, tags=["Browser"])
 app.include_router(demo.router, tags=["Demo"])
+app.include_router(runs.router, tags=["Runs"])
+app.include_router(feedback.router, tags=["Feedback"])
 
 
 if __name__ == "__main__":
