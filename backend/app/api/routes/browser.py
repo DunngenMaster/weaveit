@@ -45,7 +45,7 @@ async def start_browser_session(request: BrowserSessionStartRequest):
     event = Event(
         user_id=request.user_id,
         session_id=session_id,
-        provider="browserbase",
+        provider="browser",
         event_type="NAVIGATE",  # Use NAVIGATE as closest valid type
         ts=int(datetime.now().timestamp() * 1000),
         payload={"browserbase_session_id": session_id, "action": "SESSION_START"}
@@ -83,9 +83,9 @@ async def extract_job_posting(request: ExtractJobRequest):
             detail={"error": "URL_NOT_JOB_POSTING"}
         )
     
-    # Run extraction via Browserbase
-    result = browserbase_client.run_extraction(
-        request.browserbase_session_id,
+    # Run extraction via Browserbase (creates new session internally)
+    result = await browserbase_client.run_extraction(
+        request.user_id,
         request.url,
         extract_type="job_posting"
     )
@@ -98,20 +98,21 @@ async def extract_job_posting(request: ExtractJobRequest):
     
     # Extract payload data
     extracted_data = result.get("data", {})
+    browserbase_session_id = result.get("session_id", "")
+    
     payload = {
-        "job_title": extracted_data.get("job_title", ""),
+        "job_title": extracted_data.get("title", ""),
         "company": extracted_data.get("company", ""),
         "location": extracted_data.get("location", ""),
-        "employment_type": extracted_data.get("employment_type"),
-        "skills": extracted_data.get("skills", []),
-        "summary_text": extracted_data.get("summary_text", "")
+        "description": extracted_data.get("description", ""),
+        "url": extracted_data.get("url", request.url)
     }
     
     # Create PAGE_EXTRACT event
     event = Event(
         user_id=request.user_id,
-        session_id=request.browserbase_session_id,
-        provider="browserbase",
+        session_id=browserbase_session_id,
+        provider="browser",
         event_type="PAGE_EXTRACT",
         url=request.url,
         ts=int(datetime.now().timestamp() * 1000),
