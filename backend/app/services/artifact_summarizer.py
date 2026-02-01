@@ -71,7 +71,7 @@ class ArtifactSummarizer:
                 'url': url,
                 'extracted_at': extraction_data.get('extracted_at', 0)
             }
-            self.redis_client.setex(raw_html_key, 24 * 60 * 60, json.dumps(raw_data))
+            self.redis_client.client.setex(raw_html_key, 24 * 60 * 60, json.dumps(raw_data))
             
             # Extract skills from description
             skills = self._extract_skills(description)

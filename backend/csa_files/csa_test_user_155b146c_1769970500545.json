@@ -1,0 +1,61 @@
+{
+  "csa_id": "2fb7c656-8a63-4698-9272-4708da1294ee",
+  "schema_version": 1,
+  "user_id": "test_user_155b146c",
+  "created_ts_ms": 1769970500545,
+  "source_provider": "chatgpt",
+  "source_session_id": "test_session_123",
+  "title": "Japan Trip Planning - Cherry Blossom Itinerary & Hotels",
+  "user_intent": "Plan a 7-day trip to Japan during cherry blossom season, including hotel recommendations and a draft itinerary for Tokyo and Kyoto.",
+  "what_we_did": [
+    "Provided 3 hotel options for Tokyo (Shinjuku, Shibuya areas) and 2 for Kyoto (Gion, Central).",
+    "Drafted a 7-day itinerary: 3 days Tokyo, 3 days Kyoto, 1 travel day.",
+    "Included popular cherry blossom viewing spots and suggested transportation (Shinkansen)."
+  ],
+  "what_worked": [
+    "User appreciated the hotel suggestions, especially the focus on location and boutique style.",
+    "The basic itinerary structure was well-received.",
+    "Successfully identified key cherry blossom viewing periods."
+  ],
+  "what_failed": [
+    "User found the itinerary a bit too generic and wanted more unique, less touristy experiences.",
+    "Did not provide specific booking links for hotels.",
+    "Struggled to integrate user's dietary restrictions (vegetarian) into food recommendations."
+  ],
+  "constraints": [
+    "Budget: Mid-range ($150-250/night for hotels).",
+    "Dates: Late March - Early April (cherry blossom season).",
+    "Duration: 7 days.",
+    "Dietary: Vegetarian."
+  ],
+  "preferences": [
+    "Prefers boutique hotels over large chains.",
+    "Likes cultural experiences and local food markets.",
+    "Dislikes overly touristy traps."
+  ],
+  "key_entities": {
+    "locations": [
+      "Japan",
+      "Tokyo",
+      "Kyoto",
+      "Shinjuku",
+      "Shibuya",
+      "Gion"
+    ],
+    "event": "Cherry Blossom Season",
+    "transportation": "Shinkansen",
+    "diet": "Vegetarian"
+  },
+  "artifacts": [],
+  "next_steps": [
+    "Refine itinerary with more unique, less touristy activities.",
+    "Incorporate vegetarian-friendly food recommendations.",
+    "Provide booking links or options for selected hotels."
+  ],
+  "instructions_for_next_model": [
+    "Prioritize unique, local experiences for the itinerary, avoiding common tourist traps.",
+    "Ensure all food recommendations are explicitly vegetarian and provide specific restaurant suggestions.",
+    "Research and provide direct booking links for boutique hotels within the specified budget.",
+    "Ask the user about specific interests (e.g., art, history, nature) to further personalize the itinerary."
+  ]
+}
