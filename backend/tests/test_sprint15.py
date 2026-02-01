@@ -28,8 +28,13 @@ def test_streams_ingestion():
         "user_id": TEST_USER_ID,
         "session_id": str(uuid4()),
         "provider": "chatgpt",
-        "event_type": "USER_MESSAGE",
-        "text": "Test message for streams"
+        "event_type": "CHAT_TURN",
+        "ts": int(time.time() * 1000),
+        "url": "https://chatgpt.com",
+        "payload": {
+            "text": "Test message for streams",
+            "role": "user"
+        }
     }]
     
     response = requests.post(
@@ -73,8 +78,13 @@ def test_metrics_tracking():
         "user_id": TEST_USER_ID,
         "session_id": str(uuid4()),
         "provider": "chatgpt",
-        "event_type": "USER_MESSAGE",
-        "text": "Test metrics"
+        "event_type": "CHAT_TURN",
+        "ts": int(time.time() * 1000),
+        "url": "https://chatgpt.com",
+        "payload": {
+            "text": "Test metrics",
+            "role": "user"
+        }
     }]
     
     requests.post(f"{BASE_URL}/v1/events", json={"events": events})
@@ -199,8 +209,13 @@ def test_stream_replay():
             "user_id": TEST_USER_ID,
             "session_id": str(uuid4()),
             "provider": "chatgpt",
-            "event_type": "USER_MESSAGE",
-            "text": f"Replay test message {i}"
+            "event_type": "CHAT_TURN",
+            "ts": int(time.time() * 1000),
+            "url": "https://chatgpt.com",
+            "payload": {
+                "text": f"Replay test message {i}",
+                "role": "user"
+            }
         }]
         
         response = requests.post(

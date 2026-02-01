@@ -36,14 +36,16 @@ def test_streams_ingestion_and_trimming():
             f"{BASE_URL}/v1/events",
             json={
                 "events": [{
-                    "event_type": "USER_MESSAGE",
+                    "event_type": "CHAT_TURN",
                     "user_id": user_id,
+                    "session_id": str(uuid4()),
                     "provider": "chatgpt",
-                    "ts_ms": int(time.time() * 1000),
-                    "trace_id": str(uuid4()),
+                    "ts": int(time.time() * 1000),
                     "url": "https://chatgpt.com",
-                    "text": f"Test message {i} for streams",
-                    "role": "user"
+                    "payload": {
+                        "text": f"Test message {i} for streams",
+                        "role": "user"
+                    }
                 }]
             }
         )
@@ -266,14 +268,16 @@ def test_complete_flow():
         f"{BASE_URL}/v1/events",
         json={
             "events": [{
-                "event_type": "USER_MESSAGE",
+                "event_type": "CHAT_TURN",
                 "user_id": user_id,
+                "session_id": str(uuid4()),
                 "provider": "chatgpt",
-                "ts_ms": int(time.time() * 1000),
-                "trace_id": str(uuid4()),
+                "ts": int(time.time() * 1000),
                 "url": "https://chatgpt.com",
-                "text": "Help me write a Python function",
-                "role": "user"
+                "payload": {
+                    "text": "Help me write a Python function",
+                    "role": "user"
+                }
             }]
         }
     )

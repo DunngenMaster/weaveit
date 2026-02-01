@@ -45,6 +45,15 @@ def normalize(raw: Dict[str, Any]) -> CanonicalEvent:
     if "text" in raw and "text" not in payload:
         payload["text"] = raw["text"]
     
+    # Convert CHAT_TURN to USER_MESSAGE or AI_RESPONSE based on role
+    event_type = raw["event_type"]
+    if event_type == "CHAT_TURN":
+        role = payload.get("role", "user")
+        if role == "assistant":
+            event_type = "AI_RESPONSE"
+        else:
+            event_type = "USER_MESSAGE"
+    
     # Attempt thread ID will be filled by attempt tracking system
     # For now, set to empty string (will be updated before storage)
     attempt_thread_id = raw.get("attempt_thread_id", "")
@@ -55,7 +64,7 @@ def normalize(raw: Dict[str, Any]) -> CanonicalEvent:
         user_id=raw["user_id"],
         session_id=session_id,
         provider=raw["provider"],
-        event_type=raw["event_type"],
+        event_type=event_type,  # Use converted event_type
         ts_ms=ts_ms,
         attempt_thread_id=attempt_thread_id,
         payload=payload

@@ -28,8 +28,13 @@ def test_outcome_resolver():
         "user_id": TEST_USER_ID,
         "session_id": str(uuid4()),
         "provider": "chatgpt",
-        "event_type": "USER_MESSAGE",
-        "text": "How do I write a resume?"
+        "event_type": "CHAT_TURN",
+        "ts": int(time.time() * 1000),
+        "url": "https://chatgpt.com",
+        "payload": {
+            "text": "How do I write a resume?",
+            "role": "user"
+        }
     }]
     
     response1 = requests.post(
@@ -45,8 +50,13 @@ def test_outcome_resolver():
         "user_id": TEST_USER_ID,
         "session_id": str(uuid4()),
         "provider": "chatgpt",
-        "event_type": "USER_MESSAGE",
-        "text": "Perfect! That worked great."
+        "event_type": "CHAT_TURN",
+        "ts": int(time.time() * 1000),
+        "url": "https://chatgpt.com",
+        "payload": {
+            "text": "Perfect! That worked great.",
+            "role": "user"
+        }
     }]
     
     response2 = requests.post(
@@ -234,8 +244,13 @@ def test_bandit_learning():
             "user_id": TEST_USER_ID,
             "session_id": str(uuid4()),
             "provider": "chatgpt",
-            "event_type": "USER_MESSAGE",
-            "text": f"Help me with task {i}"
+            "event_type": "CHAT_TURN",
+            "ts": int(time.time() * 1000),
+            "url": "https://chatgpt.com",
+            "payload": {
+                "text": f"Help me with task {i}",
+                "role": "user"
+            }
         }]
         
         requests.post(f"{BASE_URL}/v1/events", json={"events": events})
@@ -248,8 +263,13 @@ def test_bandit_learning():
             "user_id": TEST_USER_ID,
             "session_id": str(uuid4()),
             "provider": "chatgpt",
-            "event_type": "USER_MESSAGE",
-            "text": outcome_text
+            "event_type": "CHAT_TURN",
+            "ts": int(time.time() * 1000),
+            "url": "https://chatgpt.com",
+            "payload": {
+                "text": outcome_text,
+                "role": "user"
+            }
         }]
         
         requests.post(f"{BASE_URL}/v1/events", json={"events": events2})
@@ -289,8 +309,13 @@ def test_complete_flow():
         "user_id": user_id,
         "session_id": str(uuid4()),
         "provider": "chatgpt",
-        "event_type": "USER_MESSAGE",
-        "text": "How do I implement a binary search tree?"
+        "event_type": "CHAT_TURN",
+        "ts": int(time.time() * 1000),
+        "url": "https://chatgpt.com",
+        "payload": {
+            "text": "How do I implement a binary search tree?",
+            "role": "user"
+        }
     }]
     
     r1 = requests.post(f"{BASE_URL}/v1/events", json={"events": events1})
@@ -304,8 +329,13 @@ def test_complete_flow():
         "user_id": user_id,
         "session_id": str(uuid4()),
         "provider": "chatgpt",
-        "event_type": "USER_MESSAGE",
-        "text": "Perfect! The solution works great."
+        "event_type": "CHAT_TURN",
+        "ts": int(time.time() * 1000),
+        "url": "https://chatgpt.com",
+        "payload": {
+            "text": "Perfect! The solution works great.",
+            "role": "user"
+        }
     }]
     
     r2 = requests.post(f"{BASE_URL}/v1/events", json={"events": events2})

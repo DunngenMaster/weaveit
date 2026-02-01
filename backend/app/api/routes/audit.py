@@ -11,6 +11,7 @@ Proves that memory causes behavior change by showing:
 This is THE endpoint to show judges.
 """
 
+import math
 from fastapi import APIRouter, Query, HTTPException
 from typing import Dict, Any, List
 from app.services.redis_client import redis_client
@@ -49,12 +50,30 @@ async def get_self_improvement_audit(
         
         # 1. Strategy Selection (Bandit)
         bandit = BanditSelector()
-        chosen_strategy = bandit.select_strategy(user_id, domain)
+        chosen_strategy, ucb_scores = bandit.select_strategy(user_id, domain)
         strategy_stats = bandit.get_all_stats(user_id, domain)
         
+        # Convert strategy stats to ensure JSON-serializable
+        strategy_stats_serializable = {}
+        for strat, stats in strategy_stats.items():
+            strategy_stats_serializable[str(strat)] = {
+                'shown': int(stats.get('shown', 0)),
+                'wins': int(stats.get('wins', 0)),
+                'win_rate': float(stats.get('win_rate', 0.0))
+            }
+        
+        # Convert UCB scores to serializable dict (handle inf values)
+        ucb_scores_serializable = {}
+        for k, v in ucb_scores.items():
+            if math.isinf(v):
+                ucb_scores_serializable[str(k)] = 999999.0  # Large number instead of inf
+            else:
+                ucb_scores_serializable[str(k)] = float(v)
+        
         strategy_info = {
-            'chosen_strategy': chosen_strategy,
-            'strategy_stats': strategy_stats,
+            'chosen_strategy': str(chosen_strategy),
+            'strategy_stats': strategy_stats_serializable,
+            'ucb_scores': ucb_scores_serializable,
             'selection_method': 'UCB1 multi-armed bandit',
             'explanation': f"Selected {chosen_strategy} based on exploration-exploitation balance"
         }
@@ -67,9 +86,21 @@ async def get_self_improvement_audit(
             limit=10
         )
         
+        # Convert patterns to JSON-serializable format
+        top_patterns = []
+        for p in skill_patterns[:3]:
+            top_patterns.append({
+                'pattern': str(p.get('pattern', '')),
+                'quality': float(p.get('quality', 0.0)),
+                'reward': float(p.get('reward', 0.0)),
+                'critic_score': float(p.get('critic_score', 0.0)),
+                'domain': str(p.get('domain', '')),
+                'tags': list(p.get('tags', []))
+            })
+        
         patterns_info = {
             'total_retrieved': len(skill_patterns),
-            'top_patterns': skill_patterns[:3],  # Top 3 by quality
+            'top_patterns': top_patterns,
             'min_quality_threshold': 0.5,
             'search_method': 'hybrid (alpha=0.6)',
             'max_distance_threshold': 0.75
@@ -163,8 +194,9 @@ async def get_self_improvement_audit(
         }
         
         # 7. Self-Improvement Proof
+        chosen_wins = strategy_stats_serializable.get(str(chosen_strategy), {}).get('wins', 0)
         proof_summary = {
-            'memory_drives_strategy': f"Bandit selected {chosen_strategy} based on {strategy_stats.get(chosen_strategy, {}).get('wins', 0)} wins",
+            'memory_drives_strategy': f"Bandit selected {chosen_strategy} based on {chosen_wins} wins",
             'quality_gating_works': f"{patterns_info['total_retrieved']} patterns retrieved, all above quality threshold {patterns_info['min_quality_threshold']}",
             'cache_acceleration': f"Cache {'HIT' if cache_info['cache_hit'] else 'MISS'} - {'10x faster' if cache_info['cache_hit'] else 'will cache for next time'}",
             'hybrid_search_precision': f"Hybrid search with alpha={hybrid_params['alpha']} prevents irrelevant matches (max distance {hybrid_params['max_vector_distance']})",

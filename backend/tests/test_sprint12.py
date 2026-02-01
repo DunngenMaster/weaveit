@@ -2,6 +2,7 @@
 
 import requests
 import json
+import time
 
 BASE_URL = "http://localhost:8000"
 
@@ -9,12 +10,19 @@ def test_canonical_event():
     """Test that events are normalized to canonical format"""
     print("\n=== Test 1: Canonical Event Normalization ===")
     
-    # Test USER_MESSAGE
+    # Test CHAT_TURN with proper schema
     event = {
         "user_id": "test_user_sprint12",
+        "session_id": "session_test_12",
         "provider": "chatgpt",
-        "event_type": "USER_MESSAGE",
-        "text": "Help me write a resume for a software engineer position"
+        "event_type": "CHAT_TURN",
+        "url": "https://chatgpt.com",
+        "title": "ChatGPT",
+        "ts": int(time.time() * 1000),
+        "payload": {
+            "text": "Help me write a resume for a software engineer position",
+            "role": "user"
+        }
     }
     
     response = requests.post(
@@ -42,9 +50,15 @@ def test_fingerprinting():
     for msg in messages:
         event = {
             "user_id": "test_user_sprint12",
+            "session_id": "session_test_12",
             "provider": "chatgpt",
-            "event_type": "USER_MESSAGE",
-            "text": msg
+            "event_type": "CHAT_TURN",
+            "url": "https://chatgpt.com",
+            "ts": int(time.time() * 1000),
+            "payload": {
+                "text": msg,
+                "role": "user"
+            }
         }
         
         response = requests.post(
@@ -65,9 +79,15 @@ def test_attempt_thread():
     for i in range(3):
         event = {
             "user_id": "test_user_sprint12",
+            "session_id": "session_test_12",
             "provider": "chatgpt",
-            "event_type": "USER_MESSAGE",
-            "text": "What are the best Python frameworks?"
+            "event_type": "CHAT_TURN",
+            "url": "https://chatgpt.com",
+            "ts": int(time.time() * 1000),
+            "payload": {
+                "text": "What are the best Python frameworks?",
+                "role": "user"
+            }
         }
         
         response = requests.post(
@@ -81,28 +101,38 @@ def test_attempt_thread():
 
 
 def test_trace_linking():
-    """Test that USER_MESSAGE and AI_RESPONSE share same trace_id"""
+    """Test that multiple CHAT_TURN events in same session are tracked"""
     print("\n=== Test 4: Trace Linking ===")
     
     import uuid
-    trace_id = str(uuid.uuid4())
+    session_id = str(uuid.uuid4())
     
     # User message
     user_event = {
         "user_id": "test_user_sprint12",
+        "session_id": session_id,
         "provider": "chatgpt",
-        "event_type": "USER_MESSAGE",
-        "trace_id": trace_id,
-        "text": "Tell me about machine learning"
+        "event_type": "CHAT_TURN",
+        "url": "https://chatgpt.com",
+        "ts": int(time.time() * 1000),
+        "payload": {
+            "text": "Tell me about machine learning",
+            "role": "user"
+        }
     }
     
-    # AI response
+    # AI response (as another CHAT_TURN)
     ai_event = {
         "user_id": "test_user_sprint12",
+        "session_id": session_id,
         "provider": "chatgpt",
-        "event_type": "AI_RESPONSE",
-        "trace_id": trace_id,
-        "text": "Machine learning is a subset of artificial intelligence..."
+        "event_type": "CHAT_TURN",
+        "url": "https://chatgpt.com",
+        "ts": int(time.time() * 1000) + 1000,
+        "payload": {
+            "text": "Machine learning is a subset of artificial intelligence...",
+            "role": "assistant"
+        }
     }
     
     response = requests.post(
@@ -111,8 +141,8 @@ def test_trace_linking():
     )
     
     print(f"Status: {response.status_code}")
-    print(f"Trace ID: {trace_id}")
-    print("✓ Request/response pair ingested with shared trace_id")
+    print(f"Session ID: {session_id}")
+    print("✓ Request/response pair ingested with shared session_id")
 
 
 def test_missing_required_fields():
@@ -121,9 +151,11 @@ def test_missing_required_fields():
     
     # Missing user_id
     event = {
+        "session_id": "test_session",
         "provider": "chatgpt",
-        "event_type": "USER_MESSAGE",
-        "text": "Test message"
+        "event_type": "CHAT_TURN",
+        "ts": int(time.time() * 1000),
+        "payload": {"text": "Test message"}
     }
     
     response = requests.post(
@@ -132,7 +164,7 @@ def test_missing_required_fields():
     )
     
     print(f"Missing user_id -> Status: {response.status_code}")
-    assert response.status_code == 400, "Should reject event without user_id"
+    assert response.status_code == 422, "Should reject event without user_id"
     print("✓ Correctly rejected invalid event")
 
 

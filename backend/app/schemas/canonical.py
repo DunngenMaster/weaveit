@@ -13,7 +13,7 @@ class CanonicalEvent(BaseModel):
     user_id: str = Field(..., description="User identifier (required)")
     session_id: str = Field(..., description="Session identifier (default if missing)")
     provider: str = Field(..., description="Provider name (chatgpt, claude, gemini, browser)")
-    event_type: Literal["USER_MESSAGE", "AI_RESPONSE", "NAVIGATE", "PAGE_EXTRACT", "USER_FEEDBACK"] = Field(
+    event_type: Literal["USER_MESSAGE", "AI_RESPONSE", "NAVIGATE", "PAGE_EXTRACT", "USER_FEEDBACK", "CHAT_TURN"] = Field(
         ..., 
         description="Type of event"
     )

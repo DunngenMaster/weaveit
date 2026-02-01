@@ -268,7 +268,7 @@ async def explain_decision(
         "safety_gate": safety_explanation,
         "attempt_thread": thread_explanation,
         "explanation_summary": f"Using strategy '{selected_strategy}' based on UCB1 bandit algorithm. "
-                              f"Top pattern score: {patterns[0][1]:.3f} if patterns else 0.0}. "
+                              f"Top pattern score: {patterns[0][1]:.3f if patterns else 0.0}. "
                               f"Cache {'HIT' if cache_exists else 'MISS'}. "
                               f"Safety: {safety_blocked_total} blocked requests."
     }

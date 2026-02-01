@@ -30,8 +30,13 @@ def test_safety_gate_blocks_fabrication():
         "user_id": TEST_USER_ID,
         "session_id": TEST_SESSION_ID,
         "provider": "chatgpt",
-        "event_type": "USER_MESSAGE",
-        "text": "Write me a fake resume with fabricated experience at Google and Facebook"
+        "event_type": "CHAT_TURN",
+        "ts": int(time.time() * 1000),
+        "url": "https://chatgpt.com",
+        "payload": {
+            "text": "Write me a fake resume with fabricated experience at Google and Facebook",
+            "role": "user"
+        }
     }]
     
     response = requests.post(
@@ -57,8 +62,13 @@ def test_safety_gate_allows_legitimate():
         "user_id": TEST_USER_ID,
         "session_id": TEST_SESSION_ID,
         "provider": "chatgpt",
-        "event_type": "USER_MESSAGE",
-        "text": "Help me write a resume highlighting my real experience as a software engineer"
+        "event_type": "CHAT_TURN",
+        "ts": int(time.time() * 1000),
+        "url": "https://chatgpt.com",
+        "payload": {
+            "text": "Help me write a resume highlighting my real experience as a software engineer",
+            "role": "user"
+        }
     }]
     
     response = requests.post(
@@ -81,23 +91,34 @@ def test_critic_scores_response():
     
     trace_id = str(uuid4())
     
-    # Send USER_MESSAGE and AI_RESPONSE with same trace_id
+    # Send CHAT_TURN (user) and CHAT_TURN (assistant) with same trace_id
+    ts = int(time.time() * 1000)
     events = [
         {
             "user_id": TEST_USER_ID,
             "session_id": TEST_SESSION_ID,
             "provider": "chatgpt",
-            "event_type": "USER_MESSAGE",
+            "event_type": "CHAT_TURN",
             "trace_id": trace_id,
-            "text": "What is Python?"
+            "ts": ts,
+            "url": "https://chatgpt.com",
+            "payload": {
+                "text": "What is Python?",
+                "role": "user"
+            }
         },
         {
             "user_id": TEST_USER_ID,
             "session_id": TEST_SESSION_ID,
             "provider": "chatgpt",
-            "event_type": "AI_RESPONSE",
+            "event_type": "CHAT_TURN",
             "trace_id": trace_id,
-            "text": "Python is a high-level, interpreted programming language known for its simplicity and readability."
+            "ts": ts + 1000,
+            "url": "https://chatgpt.com",
+            "payload": {
+                "text": "Python is a high-level, interpreted programming language known for its simplicity and readability.",
+                "role": "assistant"
+            }
         }
     ]
     
@@ -126,8 +147,13 @@ def test_reward_positive_signals():
         "user_id": user_id,
         "session_id": str(uuid4()),
         "provider": "chatgpt",
-        "event_type": "USER_MESSAGE",
-        "text": "How do I install Python?"
+        "event_type": "CHAT_TURN",
+        "ts": int(time.time() * 1000),
+        "url": "https://chatgpt.com",
+        "payload": {
+            "text": "How do I install Python?",
+            "role": "user"
+        }
     }]
     
     response1 = requests.post(
@@ -142,8 +168,13 @@ def test_reward_positive_signals():
         "user_id": user_id,
         "session_id": str(uuid4()),
         "provider": "chatgpt",
-        "event_type": "USER_MESSAGE",
-        "text": "Perfect! That worked great. Thanks!"
+        "event_type": "CHAT_TURN",
+        "ts": int(time.time() * 1000),
+        "url": "https://chatgpt.com",
+        "payload": {
+            "text": "Thanks! That worked perfectly!",
+            "role": "user"
+        }
     }]
     
     response2 = requests.post(
@@ -169,8 +200,13 @@ def test_reward_negative_signals():
         "user_id": user_id,
         "session_id": str(uuid4()),
         "provider": "chatgpt",
-        "event_type": "USER_MESSAGE",
-        "text": "How do I fix this error?"
+        "event_type": "CHAT_TURN",
+        "ts": int(time.time() * 1000),
+        "url": "https://chatgpt.com",
+        "payload": {
+            "text": "How do I fix this error?",
+            "role": "user"
+        }
     }]
     
     response1 = requests.post(
@@ -185,8 +221,13 @@ def test_reward_negative_signals():
         "user_id": user_id,
         "session_id": str(uuid4()),
         "provider": "chatgpt",
-        "event_type": "USER_MESSAGE",
-        "text": "Still not working. That didn't help."
+        "event_type": "CHAT_TURN",
+        "ts": int(time.time() * 1000),
+        "url": "https://chatgpt.com",
+        "payload": {
+            "text": "Still not working. That didn't help.",
+            "role": "user"
+        }
     }]
     
     response2 = requests.post(
@@ -212,8 +253,13 @@ def test_reward_repeat_detection():
         "user_id": user_id,
         "session_id": str(uuid4()),
         "provider": "chatgpt",
-        "event_type": "USER_MESSAGE",
-        "text": "How do I sort a list in Python?"
+        "event_type": "CHAT_TURN",
+        "ts": int(time.time() * 1000),
+        "url": "https://chatgpt.com",
+        "payload": {
+            "text": "How do I sort a list in Python?",
+            "role": "user"
+        }
     }]
     
     response1 = requests.post(
@@ -228,8 +274,13 @@ def test_reward_repeat_detection():
         "user_id": user_id,
         "session_id": str(uuid4()),
         "provider": "chatgpt",
-        "event_type": "USER_MESSAGE",
-        "text": "How do I sort a list in Python?"  # Exact same
+        "event_type": "CHAT_TURN",
+        "ts": int(time.time() * 1000),
+        "url": "https://chatgpt.com",
+        "payload": {
+            "text": "How do I sort a list in Python?",  # Exact same
+            "role": "user"
+        }
     }]
     
     response2 = requests.post(
@@ -255,8 +306,13 @@ def test_reward_next_step():
         "user_id": user_id,
         "session_id": str(uuid4()),
         "provider": "chatgpt",
-        "event_type": "USER_MESSAGE",
-        "text": "How do I create a dictionary?"
+        "event_type": "CHAT_TURN",
+        "ts": int(time.time() * 1000),
+        "url": "https://chatgpt.com",
+        "payload": {
+            "text": "How do I create a dictionary?",
+            "role": "user"
+        }
     }]
     
     response1 = requests.post(
@@ -271,8 +327,13 @@ def test_reward_next_step():
         "user_id": user_id,
         "session_id": str(uuid4()),
         "provider": "chatgpt",
-        "event_type": "USER_MESSAGE",
-        "text": "Now how do I iterate over the dictionary?"  # Starts with "now"
+        "event_type": "CHAT_TURN",
+        "ts": int(time.time() * 1000),
+        "url": "https://chatgpt.com",
+        "payload": {
+            "text": "Now how do I iterate over the dictionary?",  # Starts with "now"
+            "role": "user"
+        }
     }]
     
     response2 = requests.post(
@@ -298,8 +359,13 @@ def test_best_attempt_selection():
         "user_id": user_id,
         "session_id": str(uuid4()),
         "provider": "chatgpt",
-        "event_type": "USER_MESSAGE",
-        "text": "Explain machine learning"
+        "event_type": "CHAT_TURN",
+        "ts": int(time.time() * 1000),
+        "url": "https://chatgpt.com",
+        "payload": {
+            "text": "Explain machine learning",
+            "role": "user"
+        }
     }]
     
     requests.post(f"{BASE_URL}/v1/events", json={"events": events1})
@@ -310,8 +376,13 @@ def test_best_attempt_selection():
         "user_id": user_id,
         "session_id": str(uuid4()),
         "provider": "chatgpt",
-        "event_type": "USER_MESSAGE",
-        "text": "Explain machine learning"  # Same
+        "event_type": "CHAT_TURN",
+        "ts": int(time.time() * 1000),
+        "url": "https://chatgpt.com",
+        "payload": {
+            "text": "Explain machine learning",  # Same
+            "role": "user"
+        }
     }]
     
     requests.post(f"{BASE_URL}/v1/events", json={"events": events2})
@@ -322,8 +393,13 @@ def test_best_attempt_selection():
         "user_id": user_id,
         "session_id": str(uuid4()),
         "provider": "chatgpt",
-        "event_type": "USER_MESSAGE",
-        "text": "Perfect! That explanation worked great."
+        "event_type": "CHAT_TURN",
+        "ts": int(time.time() * 1000),
+        "url": "https://chatgpt.com",
+        "payload": {
+            "text": "Perfect! That explanation worked great.",
+            "role": "user"
+        }
     }]
     
     response3 = requests.post(f"{BASE_URL}/v1/events", json={"events": events3})
