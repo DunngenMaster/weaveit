@@ -8,11 +8,16 @@ class AgentState(TypedDict):
     limit: int
     tab_id: str
     url: Optional[str]
+    started_at_ms: Optional[int]
     status: str
+    status_reason: Optional[str]
     plan: Optional[Dict[str, Any]]
+    policy: Optional[Dict[str, Any]]
+    prompt_delta: Optional[Dict[str, Any]]
     browserbase_session_id: Optional[str]
     connect_url: Optional[str]
     live_view_url: Optional[str]
     candidate_links: List[Dict[str, Any]]
     extracted_items: List[Dict[str, Any]]
+    summary: Optional[Dict[str, Any]]
     trace: List[Dict[str, Any]]

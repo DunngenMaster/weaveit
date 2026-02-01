@@ -17,6 +17,7 @@ class RunStartResponse(BaseModel):
     
     run_id: str = Field(..., description="Run identifier")
     status: str = Field(..., description="Run status")
+    status_reason: str | None = Field(None, description="Reason for pause/stop")
 
 
 class LearnedResponse(BaseModel):
@@ -39,3 +40,8 @@ class RunDetailsResponse(BaseModel):
     trace: list = Field(default_factory=list, description="Trace events")
     connect_url: str | None = Field(None, description="Browserbase connect URL")
     live_view_url: str | None = Field(None, description="Browserbase live view URL")
+    summary: dict = Field(default_factory=dict, description="Summary + comparison")
+    patch: dict = Field(default_factory=dict, description="Learning patch")
+    applied_policy: dict = Field(default_factory=dict, description="Policy used for this run")
+    applied_prompt_delta: dict = Field(default_factory=dict, description="Prompt delta applied")
+    metrics: dict = Field(default_factory=dict, description="Run metrics")

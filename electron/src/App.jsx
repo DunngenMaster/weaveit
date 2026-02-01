@@ -32,6 +32,11 @@ export default function App() {
   const [isRunning, setIsRunning] = useState(false);
   const [runDetails, setRunDetails] = useState(null);
   const [runDetailsError, setRunDetailsError] = useState("");
+  const [runEvents, setRunEvents] = useState([]);
+  const eventsRef = useRef(null);
+  const [feedbackTags, setFeedbackTags] = useState([]);
+  const [feedbackNotes, setFeedbackNotes] = useState("");
+  const [previousRun, setPreviousRun] = useState(null);
   const [tabRuns, setTabRuns] = useState(() => ({
     [tabs[0].id]: [],
   }));
@@ -262,6 +267,11 @@ export default function App() {
     setIsRunning(true);
     setRunDetails(null);
     setRunDetailsError("");
+    setRunEvents([]);
+    if (eventsRef.current) {
+      eventsRef.current.close();
+      eventsRef.current = null;
+    }
     if (runPollRef.current) {
       clearTimeout(runPollRef.current);
       runPollRef.current = null;
@@ -306,6 +316,7 @@ export default function App() {
       });
       if (data.run_id) {
         pollRunDetails(data.run_id, 0);
+        startEventStream(data.run_id);
       }
     } catch (error) {
       setRunError(error.message || "Failed to start run");
@@ -327,6 +338,26 @@ export default function App() {
     }
   };
 
+  const startEventStream = (id) => {
+    if (!id) return;
+    const source = new EventSource(`${apiBase}/runs/${encodeURIComponent(id)}/events`);
+    eventsRef.current = source;
+    source.onmessage = (event) => {
+      try {
+        const payload = JSON.parse(event.data);
+        setRunEvents((prev) => [payload, ...prev].slice(0, 50));
+      } catch (error) {
+        // ignore
+      }
+    };
+    source.onerror = () => {
+      source.close();
+      if (eventsRef.current === source) {
+        eventsRef.current = null;
+      }
+    };
+  };
+
   const fetchRunDetails = async (id) => {
     if (!id) return null;
     const response = await fetch(`${apiBase}/runs/${encodeURIComponent(id)}`);
@@ -334,6 +365,28 @@ export default function App() {
       throw new Error(`Run details error: ${response.status}`);
     }
     return response.json();
+  };
+
+  const submitFeedback = async () => {
+    if (!runId) return;
+    await fetch(`${apiBase}/feedback`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        run_id: runId,
+        tab_id: activeTabId,
+        tags: feedbackTags,
+        notes: feedbackNotes,
+      }),
+    });
+  };
+
+  const applyAndRerun = async () => {
+    if (runDetails) {
+      setPreviousRun(runDetails);
+    }
+    await submitFeedback();
+    await startRun();
   };
 
   const pollRunDetails = async (id, attempt) => {
@@ -389,6 +442,10 @@ export default function App() {
       if (runPollRef.current) {
         clearTimeout(runPollRef.current);
         runPollRef.current = null;
+      }
+      if (eventsRef.current) {
+        eventsRef.current.close();
+        eventsRef.current = null;
       }
     };
   }, []);
@@ -527,6 +584,42 @@ export default function App() {
             )}
           </div>
           <div className="sidepanel__section">
+            <h3>Agent Timeline</h3>
+            {runEvents.length ? (
+              <ul className="runs">
+                {runEvents.map((event, idx) => (
+                  <li key={`event-${idx}`} className="runs__item">
+                    <div className="runs__row">
+                      <span className="runs__status">{event.type}</span>
+                      <span className="runs__time">
+                        {event?.payload?.status || ""}
+                      </span>
+                    </div>
+                    <div className="runs__meta">
+                      {event.payload ? JSON.stringify(event.payload) : ""}
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="muted">No timeline events yet.</p>
+            )}
+          </div>
+          <div className="sidepanel__section">
+            <h3>Console</h3>
+            {runEvents.length ? (
+              <pre className="run-details__code">
+                {runEvents
+                  .slice()
+                  .reverse()
+                  .map((event) => JSON.stringify(event))
+                  .join("\n")}
+              </pre>
+            ) : (
+              <p className="muted">No console output yet.</p>
+            )}
+          </div>
+          <div className="sidepanel__section">
             <h3>Run History</h3>
             {tabRuns[activeTabId]?.length ? (
               <ul className="runs">
@@ -544,6 +637,52 @@ export default function App() {
             ) : (
               <p className="muted">No runs yet for this tab.</p>
             )}
+          </div>
+          <div className="sidepanel__section">
+            <h3>Feedback & Improve</h3>
+            <div className="feedback-tags">
+              {[
+                "too_many_tabs",
+                "irrelevant_results",
+                "duplicate_sources",
+                "missing_specs",
+                "missing_price",
+                "needs_official_specs",
+                "needs_retailer_price",
+                "prefer_reputable_reviews",
+                "slow_run",
+                "low_confidence_extraction",
+              ].map((tag) => (
+                <button
+                  key={tag}
+                  type="button"
+                  className={`chip ${feedbackTags.includes(tag) ? "chip--active" : ""}`}
+                  onClick={() =>
+                    setFeedbackTags((prev) =>
+                      prev.includes(tag)
+                        ? prev.filter((t) => t !== tag)
+                        : [...prev, tag]
+                    )
+                  }
+                >
+                  {tag}
+                </button>
+              ))}
+            </div>
+            <textarea
+              className="feedback-notes"
+              placeholder="Optional notes (why, what to avoid, what to prefer)"
+              value={feedbackNotes}
+              onChange={(event) => setFeedbackNotes(event.target.value)}
+            />
+            <div className="feedback-actions">
+              <button className="primary" type="button" onClick={submitFeedback}>
+                Save Feedback
+              </button>
+              <button className="toolbar__button" type="button" onClick={applyAndRerun}>
+                Apply & Rerun
+              </button>
+            </div>
           </div>
           <div className="sidepanel__section">
             <h3>Learned</h3>
@@ -568,6 +707,35 @@ export default function App() {
                   <span>Status</span>
                   <span>{runDetails.status}</span>
                 </div>
+                {runDetails.status_reason ? (
+                  <div className="run-details__row">
+                    <span>Reason</span>
+                    <span>{runDetails.status_reason}</span>
+                  </div>
+                ) : null}
+                <div className="run-details__block">
+                  <div className="run-details__label">Agent Live View</div>
+                  {runDetails.live_view_url ? (
+                    <div className="run-details__live">
+                      <iframe
+                        title="Agent Live View"
+                        src={runDetails.live_view_url}
+                        className="run-details__iframe"
+                      />
+                      <button
+                        className="run-details__button"
+                        type="button"
+                        onClick={() => window.open(runDetails.live_view_url, "_blank")}
+                      >
+                        Open in new window
+                      </button>
+                    </div>
+                  ) : (
+                    <p className="muted">
+                      Live view not available yet. Start a run to create a session.
+                    </p>
+                  )}
+                </div>
                 {runDetails.plan && Object.keys(runDetails.plan).length ? (
                   <div className="run-details__block">
                     <div className="run-details__label">Plan</div>
@@ -590,6 +758,11 @@ export default function App() {
                           <div className="run-details__item-url">
                             {item.url}
                           </div>
+                          {item.score !== undefined ? (
+                            <div className="run-details__item-url">
+                              Score: {item.score} {item.reason ? `• ${item.reason}` : ""}
+                            </div>
+                          ) : null}
                         </li>
                       ))}
                     </ul>
@@ -635,6 +808,90 @@ export default function App() {
                         </li>
                       ))}
                     </ul>
+                  </div>
+                ) : null}
+                {runDetails.summary && Object.keys(runDetails.summary).length ? (
+                  <div className="run-details__block">
+                    <div className="run-details__label">Summary</div>
+                    {runDetails.summary.recommendation ? (
+                      <div className="run-details__item-title">
+                        Top Pick: {runDetails.summary.recommendation.name}
+                      </div>
+                    ) : null}
+                    {runDetails.summary.recommendation?.reason ? (
+                      <div className="run-details__item-url">
+                        {runDetails.summary.recommendation.reason}
+                      </div>
+                    ) : null}
+                    {runDetails.summary.top_three ? (
+                      <ul className="run-details__list">
+                        {runDetails.summary.top_three.map((item, idx) => (
+                          <li key={`top-${idx}`}>
+                            <div className="run-details__item-title">
+                              {item.name}
+                            </div>
+                            <div className="run-details__item-url">
+                              {item.price || ""}
+                            </div>
+                            <div className="run-details__item-url">
+                              {item.reasons ? item.reasons.join(" • ") : ""}
+                            </div>
+                          </li>
+                        ))}
+                      </ul>
+                    ) : null}
+                    {runDetails.summary.table ? (
+                      <pre className="run-details__code">
+                        {JSON.stringify(runDetails.summary.table, null, 2)}
+                      </pre>
+                    ) : null}
+                  </div>
+                ) : null}
+                {runDetails.patch && Object.keys(runDetails.patch).length ? (
+                  <div className="run-details__block">
+                    <div className="run-details__label">Learning Patch</div>
+                    <pre className="run-details__code">
+                      {JSON.stringify(runDetails.patch, null, 2)}
+                    </pre>
+                  </div>
+                ) : null}
+                {runDetails.applied_policy && Object.keys(runDetails.applied_policy).length ? (
+                  <div className="run-details__block">
+                    <div className="run-details__label">Applied Policy</div>
+                    <pre className="run-details__code">
+                      {JSON.stringify(runDetails.applied_policy, null, 2)}
+                    </pre>
+                  </div>
+                ) : null}
+                {runDetails.applied_prompt_delta && Object.keys(runDetails.applied_prompt_delta).length ? (
+                  <div className="run-details__block">
+                    <div className="run-details__label">Applied Prompt Delta</div>
+                    <pre className="run-details__code">
+                      {JSON.stringify(runDetails.applied_prompt_delta, null, 2)}
+                    </pre>
+                  </div>
+                ) : null}
+                {runDetails.metrics && Object.keys(runDetails.metrics).length ? (
+                  <div className="run-details__block">
+                    <div className="run-details__label">Run Metrics</div>
+                    <pre className="run-details__code">
+                      {JSON.stringify(runDetails.metrics, null, 2)}
+                    </pre>
+                  </div>
+                ) : null}
+                {previousRun && runDetails.metrics ? (
+                  <div className="run-details__block">
+                    <div className="run-details__label">Before / After</div>
+                    <pre className="run-details__code">
+{JSON.stringify(
+  {
+    before: previousRun.metrics || {},
+    after: runDetails.metrics || {},
+  },
+  null,
+  2
+)}
+                    </pre>
                   </div>
                 ) : null}
               </div>
