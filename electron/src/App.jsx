@@ -20,12 +20,18 @@ export default function App() {
   const [activeUrl, setActiveUrl] = useState(DEFAULT_URL);
   const [ghostMode, setGhostMode] = useState(true);
   const [pageTitle, setPageTitle] = useState("Ghost Browser");
-  const [goal, setGoal] = useState("Job research");
-  const [query, setQuery] = useState("Remote frontend roles");
+  const [goal, setGoal] = useState(
+    "Find the best noise-cancelling headphones under $200."
+  );
+  const [query, setQuery] = useState(
+    "best noise cancelling headphones under 200"
+  );
   const [runStatus, setRunStatus] = useState("Idle");
   const [runId, setRunId] = useState("");
   const [runError, setRunError] = useState("");
   const [isRunning, setIsRunning] = useState(false);
+  const [runDetails, setRunDetails] = useState(null);
+  const [runDetailsError, setRunDetailsError] = useState("");
   const [tabRuns, setTabRuns] = useState(() => ({
     [tabs[0].id]: [],
   }));
@@ -33,6 +39,7 @@ export default function App() {
   const apiBase = import.meta.env.VITE_API_BASE || "http://localhost:8000";
   const activeTab = tabs.find((tab) => tab.id === activeTabId);
   const viewportRef = useRef(null);
+  const runPollRef = useRef(null);
 
   const appendTabLog = (tabId, message) => {
     setTabLogs((prev) => {
@@ -253,6 +260,12 @@ export default function App() {
     setRunStatus("Starting...");
     setRunError("");
     setIsRunning(true);
+    setRunDetails(null);
+    setRunDetailsError("");
+    if (runPollRef.current) {
+      clearTimeout(runPollRef.current);
+      runPollRef.current = null;
+    }
     const startedAt = new Date().toLocaleTimeString();
     appendTabRun(activeTabId, {
       runId: "pending",
@@ -291,6 +304,9 @@ export default function App() {
         query,
         time: new Date().toLocaleTimeString(),
       });
+      if (data.run_id) {
+        pollRunDetails(data.run_id, 0);
+      }
     } catch (error) {
       setRunError(error.message || "Failed to start run");
       setRunStatus("Error");
@@ -311,12 +327,44 @@ export default function App() {
     }
   };
 
-  const fetchLearned = async () => {
+  const fetchRunDetails = async (id) => {
+    if (!id) return null;
+    const response = await fetch(`${apiBase}/runs/${encodeURIComponent(id)}`);
+    if (!response.ok) {
+      throw new Error(`Run details error: ${response.status}`);
+    }
+    return response.json();
+  };
+
+  const pollRunDetails = async (id, attempt) => {
     try {
-      const response = await fetch(`${apiBase}/learned`);
+      const data = await fetchRunDetails(id);
+      if (!data) return;
+      setRunDetails(data);
+      if (data.status === "completed" || data.status === "error") {
+        return;
+      }
+    } catch (error) {
+      setRunDetailsError(error.message || "Failed to load run details");
+      return;
+    }
+    if (attempt >= 15) return;
+    runPollRef.current = setTimeout(() => {
+      pollRunDetails(id, attempt + 1);
+    }, 1500);
+  };
+
+  const fetchLearned = async (tabId = activeTabId) => {
+    try {
+      const response = await fetch(
+        `${apiBase}/learned?tab_id=${encodeURIComponent(tabId || "")}`
+      );
       if (!response.ok) return;
       const data = await response.json();
-      const items = Object.entries(data || {}).map(([key, value]) => ({
+      const prefs = data?.preferences && typeof data.preferences === "object"
+        ? data.preferences
+        : {};
+      const items = Object.entries(prefs).map(([key, value]) => ({
         key,
         value,
       }));
@@ -328,6 +376,21 @@ export default function App() {
 
   useEffect(() => {
     fetchLearned();
+  }, []);
+
+  useEffect(() => {
+    if (activeTabId) {
+      fetchLearned(activeTabId);
+    }
+  }, [activeTabId]);
+  
+  useEffect(() => {
+    return () => {
+      if (runPollRef.current) {
+        clearTimeout(runPollRef.current);
+        runPollRef.current = null;
+      }
+    };
   }, []);
 
   return (
@@ -495,6 +558,90 @@ export default function App() {
               </ul>
             ) : (
               <p className="muted">No learned preferences yet.</p>
+            )}
+          </div>
+          <div className="sidepanel__section">
+            <h3>Run Details</h3>
+            {runDetails ? (
+              <div className="run-details">
+                <div className="run-details__row">
+                  <span>Status</span>
+                  <span>{runDetails.status}</span>
+                </div>
+                {runDetails.plan && Object.keys(runDetails.plan).length ? (
+                  <div className="run-details__block">
+                    <div className="run-details__label">Plan</div>
+                    <pre className="run-details__code">
+                      {JSON.stringify(runDetails.plan, null, 2)}
+                    </pre>
+                  </div>
+                ) : null}
+                <div className="run-details__block">
+                  <div className="run-details__label">
+                    Candidates ({runDetails.candidates ? runDetails.candidates.length : 0})
+                  </div>
+                  {runDetails.candidates && runDetails.candidates.length ? (
+                    <ul className="run-details__list">
+                      {runDetails.candidates.map((item, idx) => (
+                        <li key={`candidate-${idx}`}>
+                          <div className="run-details__item-title">
+                            {item.title || item.url}
+                          </div>
+                          <div className="run-details__item-url">
+                            {item.url}
+                          </div>
+                        </li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <p className="muted">No candidates found.</p>
+                  )}
+                </div>
+                {runDetails.extracted && runDetails.extracted.length ? (
+                  <div className="run-details__block">
+                    <div className="run-details__label">
+                      Extracted ({runDetails.extracted.length})
+                    </div>
+                    <ul className="run-details__list">
+                      {runDetails.extracted.map((item, idx) => (
+                        <li key={`extract-${idx}`}>
+                          <div className="run-details__item-title">
+                            {item.title || item.url}
+                          </div>
+                          <div className="run-details__item-url">
+                            {item.url}
+                          </div>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                ) : (
+                  <p className="muted">No extracted items yet.</p>
+                )}
+                {runDetails.trace && runDetails.trace.length ? (
+                  <div className="run-details__block">
+                    <div className="run-details__label">
+                      Trace ({runDetails.trace.length})
+                    </div>
+                    <ul className="run-details__list">
+                      {runDetails.trace.map((item, idx) => (
+                        <li key={`trace-${idx}`}>
+                          <div className="run-details__item-title">
+                            {item.type || "event"}
+                          </div>
+                          <div className="run-details__item-url">
+                            {item.payload ? JSON.stringify(item.payload) : ""}
+                          </div>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                ) : null}
+              </div>
+            ) : runDetailsError ? (
+              <p className="error">{runDetailsError}</p>
+            ) : (
+              <p className="muted">Run details will appear here.</p>
             )}
           </div>
         </aside>

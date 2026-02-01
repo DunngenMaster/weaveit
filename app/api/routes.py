@@ -1,4 +1,4 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, Query
 from app.models import RunRequest, RunResponse, LearnedStateResponse
 from app.agent.loop import run_agent
 from app.memory.redis_store import MemoryStore
@@ -15,5 +15,5 @@ def create_run(payload: RunRequest):
 
 
 @router.get("/learned", response_model=LearnedStateResponse)
-def learned_state():
-    return LearnedStateResponse(preferences=memory.get_preferences())
+def learned_state(tab_id: str | None = Query(default=None)):
+    return LearnedStateResponse(preferences=memory.get_preferences(tab_id), tab_id=tab_id)

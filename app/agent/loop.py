@@ -12,7 +12,7 @@ def run_agent(payload: RunRequest, memory: MemoryStore) -> RunResponse:
     init_weave()
 
     with wandb_run(run_id):
-        preferences = memory.get_preferences()
+        preferences = memory.get_preferences(payload.tab_id)
 
         steps, notes = build_playbook(payload, preferences)
 
@@ -23,7 +23,7 @@ def run_agent(payload: RunRequest, memory: MemoryStore) -> RunResponse:
         for note in notes:
             if note.startswith("PREF:"):
                 _, key, value = note.split(":", 2)
-                memory.set_preference(key, value)
+                memory.set_preference(key, value, payload.tab_id)
 
         trace_run(run_id, payload, steps, notes)
         record_run_metrics(run_id, steps, status)
