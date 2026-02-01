@@ -4,7 +4,6 @@ from app.core.config import get_settings
 
 
 class RedisClient:
-    """Redis client wrapper for connectivity checks"""
     
     def __init__(self):
         self.settings = get_settings()
@@ -12,28 +11,37 @@ class RedisClient:
     
     @property
     def client(self):
-        """Lazy initialization of Redis client"""
         if self._client is None:
-            self._client = redis.from_url(
-                self.settings.redis_url,
-                decode_responses=True,
-                socket_timeout=2,
-                socket_connect_timeout=2
-            )
+            redis_url = self.settings.redis_url
+            if redis_url.startswith("rediss://"):
+                self._client = redis.from_url(
+                    redis_url,
+                    decode_responses=True,
+                    socket_timeout=5,
+                    socket_connect_timeout=5,
+                    ssl_cert_reqs=None
+                )
+            else:
+                self._client = redis.from_url(
+                    redis_url,
+                    decode_responses=True,
+                    socket_timeout=5,
+                    socket_connect_timeout=5
+                )
         return self._client
     
     def check_health(self) -> bool:
-        """Check if Redis is reachable"""
         try:
             return self.client.ping()
         except (ConnectionError, TimeoutError, Exception):
             return False
     
     def close(self):
-        """Close Redis connection"""
         if self._client:
             self._client.close()
+    
+    def get_client(self):
+        return self.client
 
 
-# Global instance
 redis_client = RedisClient()
