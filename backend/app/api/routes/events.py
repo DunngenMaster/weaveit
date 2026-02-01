@@ -17,6 +17,8 @@ from app.services.reward import reward_resolver
 from app.services.handoff_detector import handoff_detector  # Sprint 18.5
 from app.services.csa_builder import csa_builder  # Sprint 18
 from app.services.csa_store import csa_store  # Sprint 18
+from app.services.bandit_selector import bandit_selector  # Self-improvement
+from dashboard.publisher import dashboard  # Dashboard events
 
 # Sprint 15: New imports for Redis Streams
 USE_STREAMS = True  # Feature flag for gradual rollout
@@ -42,6 +44,34 @@ def is_sensitive_url(url: str | None) -> bool:
     ]
     
     return any(pattern in url_lower for pattern in sensitive_patterns)
+
+
+def classify_domain(text: str, url: str = "") -> str:
+    """Classify domain/category from user message for bandit selection"""
+    text_lower = text.lower()
+    url_lower = url.lower() if url else ""
+    
+    # Resume/CV related
+    if any(word in text_lower for word in ['resume', 'cv', 'curriculum vitae', 'job application']):
+        return "resume"
+    
+    # Coding/programming
+    if any(word in text_lower for word in ['code', 'python', 'javascript', 'debug', 'function', 'error', 'bug', 'programming']):
+        return "coding"
+    
+    # Job search
+    if any(word in text_lower for word in ['job', 'career', 'linkedin', 'indeed', 'hiring', 'interview']):
+        if 'linkedin.com' in url_lower or 'indeed.com' in url_lower:
+            return "job_search"
+        if any(word in text_lower for word in ['search', 'find', 'looking for', 'apply']):
+            return "job_search"
+    
+    # Writing/content creation
+    if any(word in text_lower for word in ['write', 'essay', 'article', 'blog', 'content', 'draft', 'editing']):
+        return "writing"
+    
+    # Default
+    return "general"
 
 
 def write_memory_to_weaviate(user_id: str, candidate: dict):
@@ -130,6 +160,25 @@ async def ingest_events(batch: EventBatch):
                 fingerprint = compute_fp(text)
                 canonical.payload["fingerprint"] = fingerprint
                 
+                # Self-Improvement: Classify domain and select strategy
+                url = canonical.payload.get("url", "")
+                domain = classify_domain(text, url)
+                strategy, ucb_scores = bandit_selector.select_strategy(canonical.user_id, domain)
+                bandit_selector.record_shown(canonical.user_id, domain, strategy)
+                
+                # Store for context injection and tracking
+                canonical.payload["domain"] = domain
+                canonical.payload["selected_strategy"] = strategy
+                canonical.payload["ucb_scores"] = {k: round(v, 3) if v != float('inf') else 999.0 for k, v in ucb_scores.items()}
+                
+                # Publish to dashboard
+                dashboard.publish_sync("bandit_selection", {
+                    "strategy": strategy,
+                    "domain": domain,
+                    "user_id": canonical.user_id,
+                    "ucb_scores": canonical.payload["ucb_scores"]
+                })
+                
                 # Story 18.5: Check if handoff is needed
                 provider = canonical.provider
                 handoff_needed = handoff_detector.check_handoff_needed(
@@ -168,48 +217,8 @@ async def ingest_events(batch: EventBatch):
                 canonical.attempt_thread_id = attempt_thread_id
                 
                 # Sprint 13.3: Reward evaluation for previous attempt
-                # When new USER_MESSAGE arrives, evaluate the previous AI_RESPONSE
-                if attempt_count > 1:
-                    # Get previous attempts
-                    records = attempt_thread_manager.get_attempt_records(attempt_thread_id, limit=10)
-                    
-                    if len(records) > 0:
-                        # Get previous attempt (most recent before this)
-                        prev_record = records[0]
-                        prev_fingerprint = prev_record.get("payload", {}).get("fingerprint")
-                        prev_ts_ms = prev_record.get("ts_ms")
-                        prev_attempt_id = prev_record.get("attempt_id")
-                        
-                        # Compute reward
-                        reward_result = reward_resolver(
-                            new_message=text,
-                            new_fingerprint=fingerprint,
-                            previous_fingerprint=prev_fingerprint,
-                            previous_timestamp_ms=prev_ts_ms
-                        )
-                        
-                        # Update previous attempt record with reward
-                        attempt_thread_manager.update_attempt_record_reward(
-                            attempt_thread_id=attempt_thread_id,
-                            attempt_id=prev_attempt_id,
-                            reward=reward_result.reward,
-                            outcome=reward_result.outcome
-                        )
-                        
-                        print(f"[REWARD] Previous attempt: reward={reward_result.reward}, outcome={reward_result.outcome}, reason={reward_result.reason}")
-                        
-                        # Update best attempt if eligible
-                        prev_critic_score = prev_record.get("critic_score", 0.0)
-                        became_best = attempt_thread_manager.update_best_attempt(
-                            attempt_thread_id=attempt_thread_id,
-                            attempt_id=prev_attempt_id,
-                            reward=reward_result.reward,
-                            critic_score=prev_critic_score,
-                            outcome=reward_result.outcome
-                        )
-                        
-                        if became_best:
-                            print(f"[BEST_ATTEMPT] New best: {prev_attempt_id[:8]}...")
+                # NOTE: Reward evaluation moved to stream_consumer.py (Sprint 15 architecture)
+                # Stream consumer handles: reward computation, bandit win/loss, best attempt updates
                 
                 # Add attempt record (initial, will be updated with critic score later)
                 attempt_thread_manager.add_attempt_record(

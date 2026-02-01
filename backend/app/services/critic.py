@@ -9,6 +9,7 @@ import json
 from typing import List, Literal
 from pydantic import BaseModel, Field
 from app.services.gemini_client import gemini_client
+from dashboard.publisher import dashboard
 
 
 ViolationType = Literal["FABRICATION", "POLICY_BLOCKED", "NOT_SPECIFIC", "TOO_LONG", "MISALIGNED"]
@@ -99,7 +100,17 @@ Evaluate the AI response quality and compliance."""
         
         # Parse JSON response
         result_json = json.loads(response.strip())
-        return CriticResult(**result_json)
+        result = CriticResult(**result_json)
+        
+        # Publish to live dashboard
+        dashboard.publish_sync("judge_evaluation", {
+            "score": result.critic_score,
+            "violations": result.violations,
+            "reasons": result.reasons,
+            "criteria": "quality_compliance"
+        })
+        
+        return result
         
     except json.JSONDecodeError as e:
         # Fallback: if JSON parse fails, give neutral score
