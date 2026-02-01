@@ -20,7 +20,6 @@ async def job_to_context(request: JobToContextRequest):
     # Step 1: Extract job posting
     extract_request = ExtractJobRequest(
         user_id=request.user_id,
-        browserbase_session_id=request.browserbase_session_id,
         url=request.job_url
     )
     
