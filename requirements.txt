@@ -1,0 +1,7 @@
+fastapi==0.115.5
+uvicorn==0.30.6
+pydantic==2.8.2
+redis==5.0.8
+python-dotenv==1.0.1
+wandb==0.17.9
+weave==0.51.36
