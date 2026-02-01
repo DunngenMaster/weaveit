@@ -7,3 +7,4 @@ weaviate-client
 google-generativeai
 python-dotenv
 httpx
+playwright
