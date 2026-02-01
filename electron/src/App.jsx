@@ -316,7 +316,10 @@ export default function App() {
       const response = await fetch(`${apiBase}/learned`);
       if (!response.ok) return;
       const data = await response.json();
-      const items = Object.entries(data || {}).map(([key, value]) => ({
+      const prefs = data?.preferences && typeof data.preferences === "object"
+        ? data.preferences
+        : {};
+      const items = Object.entries(prefs).map(([key, value]) => ({
         key,
         value,
       }));
