@@ -9,12 +9,13 @@ class BrowserbaseClient:
     def __init__(self):
         self.settings = get_settings()
         self.api_key = getattr(self.settings, 'browserbase_api_key', '')
+        self.project_id = getattr(self.settings, 'browserbase_project_id', '')
         self.base_url = "https://api.browserbase.com/v1"
     
     def _get_headers(self) -> dict:
         """Get request headers with API key"""
         return {
-            "Authorization": f"Bearer {self.api_key}",
+            "X-BB-API-Key": self.api_key,
             "Content-Type": "application/json"
         }
     
@@ -39,7 +40,10 @@ class BrowserbaseClient:
                 response = client.post(
                     f"{self.base_url}/sessions",
                     headers=self._get_headers(),
-                    json={"metadata": {"user_id": user_id}}
+                    json={
+                        "projectId": self.project_id,
+                        "userMetadata": {"user_id": user_id}
+                    }
                 )
                 
                 if response.status_code != 200 and response.status_code != 201:
