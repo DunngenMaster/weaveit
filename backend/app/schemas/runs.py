@@ -37,3 +37,5 @@ class RunDetailsResponse(BaseModel):
     candidates: list = Field(default_factory=list, description="Candidate links")
     extracted: list = Field(default_factory=list, description="Extracted items")
     trace: list = Field(default_factory=list, description="Trace events")
+    connect_url: str | None = Field(None, description="Browserbase connect URL")
+    live_view_url: str | None = Field(None, description="Browserbase live view URL")

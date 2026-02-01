@@ -44,6 +44,7 @@ def run_agent(run_id: str, goal: str, query: str, limit: int, tab_id: str, url: 
         "plan": None,
         "browserbase_session_id": None,
         "connect_url": None,
+        "live_view_url": None,
         "candidate_links": [],
         "extracted_items": [],
         "trace": []
@@ -55,6 +56,8 @@ def run_agent(run_id: str, goal: str, query: str, limit: int, tab_id: str, url: 
         trace = result.get("trace", [])
         extracted_items = result.get("extracted_items", [])
         candidate_links = result.get("candidate_links", [])
+        connect_url = result.get("connect_url")
+        live_view_url = result.get("live_view_url")
         plan = result.get("plan")
         
         run_key = f"run:{run_id}"
@@ -64,7 +67,9 @@ def run_agent(run_id: str, goal: str, query: str, limit: int, tab_id: str, url: 
             "plan": json.dumps(plan or {}),
             "trace": json.dumps(trace),
             "extracted": json.dumps(extracted_items),
-            "candidates": json.dumps(candidate_links)
+            "candidates": json.dumps(candidate_links),
+            "connect_url": connect_url or "",
+            "live_view_url": live_view_url or ""
         })
         client.expire(run_key, 86400)
         

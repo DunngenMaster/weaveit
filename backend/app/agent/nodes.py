@@ -56,12 +56,15 @@ def browse_node(state: Dict[str, Any]) -> Dict[str, Any]:
     session_key = f"tab:{tab_id}:browserbase_session"
     session_id = client.get(session_key)
     connect_url = None
+    live_view_url = None
     
     if not session_id:
         session_result = browserbase_client.create_session(tab_id or "agent")
         if session_result.get("ok"):
             session_id = session_result.get("session_id")
-            connect_url = session_result.get("data", {}).get("connectUrl")
+            session_data = session_result.get("data", {}) or {}
+            connect_url = session_data.get("connectUrl")
+            live_view_url = session_data.get("liveViewUrl") or session_data.get("live_view_url")
             if session_id:
                 client.setex(session_key, 86400, session_id)
         else:
@@ -73,7 +76,9 @@ def browse_node(state: Dict[str, Any]) -> Dict[str, Any]:
     else:
         session_info = browserbase_client.get_session(session_id)
         if session_info.get("ok"):
-            connect_url = session_info.get("session", {}).get("connectUrl")
+            session_data = session_info.get("session", {}) or {}
+            connect_url = session_data.get("connectUrl")
+            live_view_url = session_data.get("liveViewUrl") or session_data.get("live_view_url")
     
     if not connect_url:
         trace.append({"type": "browse", "payload": {"status": "error", "error": "missing_connect_url"}})
@@ -156,7 +161,8 @@ def browse_node(state: Dict[str, Any]) -> Dict[str, Any]:
         "trace": trace,
         "candidate_links": candidates,
         "browserbase_session_id": session_id,
-        "connect_url": connect_url
+        "connect_url": connect_url,
+        "live_view_url": live_view_url
     }
 
 

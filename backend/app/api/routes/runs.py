@@ -172,7 +172,9 @@ async def get_run_details(run_id: str):
             plan=plan or {},
             candidates=candidates or [],
             extracted=extracted or [],
-            trace=trace or []
+            trace=trace or [],
+            connect_url=data.get("connect_url") or None,
+            live_view_url=data.get("live_view_url") or None
         )
     
     except HTTPException:

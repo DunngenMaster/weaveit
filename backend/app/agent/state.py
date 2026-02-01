@@ -12,6 +12,7 @@ class AgentState(TypedDict):
     plan: Optional[Dict[str, Any]]
     browserbase_session_id: Optional[str]
     connect_url: Optional[str]
+    live_view_url: Optional[str]
     candidate_links: List[Dict[str, Any]]
     extracted_items: List[Dict[str, Any]]
     trace: List[Dict[str, Any]]
