@@ -1,6 +1,7 @@
-import React, { useMemo, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 
-const DEFAULT_URL = "https://example.com";
+const DEFAULT_URL = "about:blank";
+const DEFAULT_SEARCH_ENGINE = "https://www.google.com/search?q=";
 
 export default function App() {
   const [tabs, setTabs] = useState([
@@ -11,6 +12,9 @@ export default function App() {
       favicon: "",
     },
   ]);
+  const [tabLogs, setTabLogs] = useState(() => ({
+    [tabs[0].id]: [],
+  }));
   const [activeTabId, setActiveTabId] = useState(tabs[0].id);
   const [url, setUrl] = useState(DEFAULT_URL);
   const [activeUrl, setActiveUrl] = useState(DEFAULT_URL);
@@ -21,8 +25,111 @@ export default function App() {
   const [runStatus, setRunStatus] = useState("Idle");
   const [runId, setRunId] = useState("");
   const [runError, setRunError] = useState("");
-  const webviewMapRef = useRef(new Map());
+  const [isRunning, setIsRunning] = useState(false);
+  const [tabRuns, setTabRuns] = useState(() => ({
+    [tabs[0].id]: [],
+  }));
+  const [learned, setLearned] = useState([]);
   const apiBase = import.meta.env.VITE_API_BASE || "http://localhost:8000";
+  const activeTab = tabs.find((tab) => tab.id === activeTabId);
+  const viewportRef = useRef(null);
+
+  const appendTabLog = (tabId, message) => {
+    setTabLogs((prev) => {
+      const existing = prev[tabId] || [];
+      const next = [...existing, message].slice(-200);
+      return { ...prev, [tabId]: next };
+    });
+  };
+
+  const appendTabRun = (tabId, entry) => {
+    setTabRuns((prev) => {
+      const existing = prev[tabId] || [];
+      const next = [entry, ...existing].slice(0, 10);
+      return { ...prev, [tabId]: next };
+    });
+  };
+
+  useEffect(() => {
+    const api = window.ghost?.tabs;
+    if (!api) return;
+    api.onEvent((payload) => {
+      if (!payload?.tabId) return;
+      if (payload.type === "navigate") {
+        appendTabLog(payload.tabId, `Navigate: ${payload.url}`);
+        setTabs((prev) =>
+          prev.map((tab) =>
+            tab.id === payload.tabId ? { ...tab, url: payload.url } : tab
+          )
+        );
+        if (payload.tabId === activeTabId) {
+          setActiveUrl(payload.url);
+          setUrl(payload.url);
+        }
+      }
+      if (payload.type === "title") {
+        setTabs((prev) =>
+          prev.map((tab) =>
+            tab.id === payload.tabId
+              ? { ...tab, title: payload.title }
+              : tab
+          )
+        );
+        if (payload.tabId === activeTabId) {
+          setPageTitle(payload.title || "Ghost Browser");
+        }
+      }
+      if (payload.type === "favicon") {
+        setTabs((prev) =>
+          prev.map((tab) =>
+            tab.id === payload.tabId
+              ? { ...tab, favicon: payload.favicon }
+              : tab
+          )
+        );
+      }
+      if (payload.type === "error") {
+        appendTabLog(
+          payload.tabId,
+          `Load failed: ${payload.url || ""} (${payload.errorCode})`
+        );
+      }
+    });
+  }, [activeTabId]);
+
+  useEffect(() => {
+    const api = window.ghost?.tabs;
+    if (!api || !viewportRef.current) return;
+    const element = viewportRef.current;
+
+    const sendBounds = () => {
+      const rect = element.getBoundingClientRect();
+      api.setBounds({
+        x: Math.round(rect.left),
+        y: Math.round(rect.top),
+        width: Math.round(rect.width),
+        height: Math.round(rect.height),
+      });
+    };
+
+    sendBounds();
+    const observer = new ResizeObserver(() => sendBounds());
+    observer.observe(element);
+    window.addEventListener("resize", sendBounds);
+    return () => {
+      observer.disconnect();
+      window.removeEventListener("resize", sendBounds);
+    };
+  }, []);
+
+  useEffect(() => {
+    const api = window.ghost?.tabs;
+    if (!api) return;
+    const first = tabs[0];
+    if (!first) return;
+    api.create(first.id, first.url);
+    api.switch(first.id);
+  }, []);
 
   const onGo = (event) => {
     event.preventDefault();
@@ -32,87 +139,36 @@ export default function App() {
     const looksLikeDomain = /\.[a-z]{2,}$/i.test(trimmed);
     const isSearch = !hasProtocol && !looksLikeDomain;
     const nextUrl = isSearch
-      ? `https://duckduckgo.com/?q=${encodeURIComponent(trimmed)}`
+      ? `${DEFAULT_SEARCH_ENGINE}${encodeURIComponent(trimmed)}`
       : hasProtocol
         ? trimmed
         : `https://${trimmed}`;
     setActiveUrl(nextUrl);
+    setUrl(nextUrl);
     setTabs((prev) =>
       prev.map((tab) =>
         tab.id === activeTabId ? { ...tab, url: nextUrl } : tab
       )
     );
-    getActiveWebview()?.loadURL(nextUrl);
+    window.ghost?.tabs?.navigate(activeTabId, nextUrl);
   };
 
   const statusText = useMemo(() => {
     return ghostMode ? "Ghost Mode: On" : "Ghost Mode: Off";
   }, [ghostMode]);
 
-  const attachWebviewListeners = (webview, tabId) => {
-    if (webview.dataset.bound === "1") return;
-    webview.dataset.bound = "1";
-
-    const handleNavigate = (event) => {
-      if (!event?.url) return;
-      setTabs((prev) =>
-        prev.map((tab) =>
-          tab.id === tabId ? { ...tab, url: event.url } : tab
-        )
-      );
-      if (tabId === activeTabId) {
-        setActiveUrl(event.url);
-        setUrl(event.url);
-      }
-    };
-
-    const handleTitle = (event) => {
-      if (!event?.title) return;
-      setTabs((prev) =>
-        prev.map((tab) =>
-          tab.id === tabId ? { ...tab, title: event.title } : tab
-        )
-      );
-      if (tabId === activeTabId) {
-        setPageTitle(event.title);
-      }
-    };
-
-    const handleFavicon = (event) => {
-      const iconUrl = event?.favicons?.[0];
-      if (!iconUrl) return;
-      setTabs((prev) =>
-        prev.map((tab) =>
-          tab.id === tabId ? { ...tab, favicon: iconUrl } : tab
-        )
-      );
-    };
-
-    webview.addEventListener("did-navigate", handleNavigate);
-    webview.addEventListener("did-navigate-in-page", handleNavigate);
-    webview.addEventListener("page-title-updated", handleTitle);
-    webview.addEventListener("page-favicon-updated", handleFavicon);
-  };
-
-  const setWebviewRef = (tabId) => (node) => {
-    if (!node) {
-      webviewMapRef.current.delete(tabId);
-      return;
-    }
-    webviewMapRef.current.set(tabId, node);
-    attachWebviewListeners(node, tabId);
-  };
-
-  const getActiveWebview = () => webviewMapRef.current.get(activeTabId);
-
   const addTab = () => {
     const id = crypto.randomUUID();
     const newTab = { id, url: DEFAULT_URL, title: "New Tab", favicon: "" };
     setTabs((prev) => [...prev, newTab]);
+    setTabLogs((prev) => ({ ...prev, [id]: [] }));
+    setTabRuns((prev) => ({ ...prev, [id]: [] }));
     setActiveTabId(id);
     setActiveUrl(DEFAULT_URL);
     setUrl(DEFAULT_URL);
     setPageTitle("Ghost Browser");
+    window.ghost?.tabs?.create(id, DEFAULT_URL);
+    window.ghost?.tabs?.switch(id);
   };
 
   const switchTab = (tabId) => {
@@ -122,51 +178,90 @@ export default function App() {
     setActiveUrl(tab.url);
     setUrl(tab.url);
     setPageTitle(tab.title || "Ghost Browser");
-    webviewMapRef.current.get(tabId)?.loadURL(tab.url);
+    window.ghost?.tabs?.switch(tabId);
   };
 
   const closeTab = (tabId) => {
+    const isLastTab = tabs.length === 1;
+    const fallbackId = isLastTab ? crypto.randomUUID() : null;
     setTabs((prev) => {
       const nextTabs = prev.filter((tab) => tab.id !== tabId);
       if (nextTabs.length === 0) {
-        const id = crypto.randomUUID();
+        const id = fallbackId || crypto.randomUUID();
         return [{ id, url: DEFAULT_URL, title: "New Tab", favicon: "" }];
       }
       return nextTabs;
     });
+    setTabLogs((prev) => {
+      const next = { ...prev };
+      delete next[tabId];
+      if (Object.keys(next).length === 0 && fallbackId) {
+        next[fallbackId] = [];
+      }
+      return next;
+    });
+    setTabRuns((prev) => {
+      const next = { ...prev };
+      delete next[tabId];
+      if (Object.keys(next).length === 0 && fallbackId) {
+        next[fallbackId] = [];
+      }
+      return next;
+    });
 
     if (tabId === activeTabId) {
-      const remaining = tabs.filter((tab) => tab.id !== tabId);
-      const nextActive = remaining[0];
-      if (nextActive) {
-        setActiveTabId(nextActive.id);
-        setActiveUrl(nextActive.url);
-        setUrl(nextActive.url);
-        setPageTitle(nextActive.title || "Ghost Browser");
-      } else {
-        setActiveTabId("");
+      if (isLastTab && fallbackId) {
+        setActiveTabId(fallbackId);
         setActiveUrl(DEFAULT_URL);
         setUrl(DEFAULT_URL);
         setPageTitle("Ghost Browser");
+        window.ghost?.tabs?.create(fallbackId, DEFAULT_URL);
+        window.ghost?.tabs?.switch(fallbackId);
+      } else {
+        const remaining = tabs.filter((tab) => tab.id !== tabId);
+        const nextActive = remaining[0];
+        if (nextActive) {
+          setActiveTabId(nextActive.id);
+          setActiveUrl(nextActive.url);
+          setUrl(nextActive.url);
+          setPageTitle(nextActive.title || "Ghost Browser");
+          window.ghost?.tabs?.switch(nextActive.id);
+        } else {
+          setActiveTabId("");
+          setActiveUrl(DEFAULT_URL);
+          setUrl(DEFAULT_URL);
+          setPageTitle("Ghost Browser");
+        }
       }
     }
+    window.ghost?.tabs?.close(tabId);
   };
 
   const onBack = () => {
-    getActiveWebview()?.goBack();
+    window.ghost?.tabs?.back();
   };
 
   const onForward = () => {
-    getActiveWebview()?.goForward();
+    window.ghost?.tabs?.forward();
   };
 
   const onReload = () => {
-    getActiveWebview()?.reload();
+    window.ghost?.tabs?.reload();
   };
 
   const startRun = async () => {
     setRunStatus("Starting...");
     setRunError("");
+    setIsRunning(true);
+    const startedAt = new Date().toLocaleTimeString();
+    appendTabRun(activeTabId, {
+      runId: "pending",
+      status: "Starting",
+      goal,
+      query,
+      time: startedAt,
+    });
+    appendTabLog(activeTabId, `Run: starting (${goal})`);
     try {
       const response = await fetch(`${apiBase}/runs`, {
         method: "POST",
@@ -175,6 +270,8 @@ export default function App() {
           goal,
           query,
           limit: 5,
+          tab_id: activeTabId,
+          url: activeUrl,
         }),
       });
       if (!response.ok) {
@@ -183,11 +280,55 @@ export default function App() {
       const data = await response.json();
       setRunId(data.run_id || "");
       setRunStatus(data.status || "Completed");
+      appendTabLog(activeTabId, `Run: ${data.status || "Completed"}`);
+      if (data.run_id) {
+        appendTabLog(activeTabId, `Run ID: ${data.run_id}`);
+      }
+      appendTabRun(activeTabId, {
+        runId: data.run_id || "unknown",
+        status: data.status || "Completed",
+        goal,
+        query,
+        time: new Date().toLocaleTimeString(),
+      });
     } catch (error) {
       setRunError(error.message || "Failed to start run");
       setRunStatus("Error");
+      appendTabLog(
+        activeTabId,
+        `Run: error (${error.message || "Failed to start run"})`
+      );
+      appendTabRun(activeTabId, {
+        runId: "error",
+        status: "Error",
+        goal,
+        query,
+        time: new Date().toLocaleTimeString(),
+      });
+    } finally {
+      setIsRunning(false);
+      fetchLearned();
     }
   };
+
+  const fetchLearned = async () => {
+    try {
+      const response = await fetch(`${apiBase}/learned`);
+      if (!response.ok) return;
+      const data = await response.json();
+      const items = Object.entries(data || {}).map(([key, value]) => ({
+        key,
+        value,
+      }));
+      setLearned(items);
+    } catch (error) {
+      // no-op
+    }
+  };
+
+  useEffect(() => {
+    fetchLearned();
+  }, []);
 
   return (
     <div className="app">
@@ -254,7 +395,11 @@ export default function App() {
           </div>
           <div className="omnibox">
             <span className="omnibox__lock">🔒</span>
-            <span className="omnibox__favicon" />
+            {activeTab?.favicon ? (
+              <img className="omnibox__favicon" src={activeTab.favicon} alt="" />
+            ) : (
+              <span className="omnibox__favicon" />
+            )}
             <input
               className="toolbar__input"
               value={url}
@@ -276,19 +421,7 @@ export default function App() {
       </section>
 
       <main className="viewport">
-        <div className="viewport__frame">
-          {tabs.map((tab) => (
-            <webview
-              key={tab.id}
-              ref={setWebviewRef(tab.id)}
-              className={`viewport__webview ${
-                tab.id === activeTabId ? "viewport__webview--active" : ""
-              }`}
-              src={tab.url}
-              partition={`persist:ghost-${tab.id}`}
-            />
-          ))}
-        </div>
+        <div className="viewport__frame" ref={viewportRef} />
 
         <aside className="sidepanel">
           <div className="sidepanel__section">
@@ -310,7 +443,7 @@ export default function App() {
               />
             </label>
             <button className="primary" type="button" onClick={startRun}>
-              Start Run
+              {isRunning ? "Starting..." : "Start Run"}
             </button>
             <div className="run-status">
               <div>Status: {runStatus}</div>
@@ -320,18 +453,49 @@ export default function App() {
           </div>
           <div className="sidepanel__section">
             <h3>Agent Log</h3>
-            <ul>
-              <li>Observe: waiting for page context</li>
-              <li>Plan: build playbook</li>
-              <li>Act: execute browser steps</li>
-              <li>Evaluate: success metrics</li>
-              <li>Update: store preferences</li>
-            </ul>
+            {tabLogs[activeTabId]?.length ? (
+              <ul>
+                {tabLogs[activeTabId].map((entry, idx) => (
+                  <li key={`${activeTabId}-${idx}`}>{entry}</li>
+                ))}
+              </ul>
+            ) : (
+              <p className="muted">No activity yet for this tab.</p>
+            )}
+          </div>
+          <div className="sidepanel__section">
+            <h3>Run History</h3>
+            {tabRuns[activeTabId]?.length ? (
+              <ul className="runs">
+                {tabRuns[activeTabId].map((run, idx) => (
+                  <li key={`${activeTabId}-run-${idx}`} className="runs__item">
+                    <div className="runs__row">
+                      <span className="runs__status">{run.status}</span>
+                      <span className="runs__time">{run.time}</span>
+                    </div>
+                    <div className="runs__meta">{run.goal}</div>
+                    <div className="runs__meta">{run.query}</div>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="muted">No runs yet for this tab.</p>
+            )}
           </div>
           <div className="sidepanel__section">
             <h3>Learned</h3>
-            <p>Preference: Remote-only</p>
-            <p>Patch: fallback selector for search button</p>
+            {learned.length ? (
+              <ul className="learned">
+                {learned.map((item) => (
+                  <li key={item.key} className="learned__item">
+                    <span className="learned__key">{item.key}</span>
+                    <span className="learned__value">{item.value}</span>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="muted">No learned preferences yet.</p>
+            )}
           </div>
         </aside>
       </main>
