@@ -72,14 +72,23 @@ async def start_run(request: RunStartRequest, background_tasks: BackgroundTasks)
                 )
                 if memories:
                     mem = memories[0]
-                    policy_json = mem.get("policy_json") or "{}"
+                    # Load learned patch if it exists
+                    patch_json = mem.get("patch_json") or "{}"
                     prompt_json = mem.get("prompt_delta_json") or "{}"
-                    policy_from_mem = json.loads(policy_json)
+                    learned_patch = json.loads(patch_json)
                     prompt_delta = json.loads(prompt_json)
-                    for key, value in policy_from_mem.items():
+                    
+                    # Apply policy_delta from the learned patch
+                    policy_delta = learned_patch.get("policy_delta", {}) or {}
+                    for key, value in policy_delta.items():
                         if key in policy and value is not None:
                             policy[key] = str(value)
-            except Exception:
+                    
+                    # Also merge prompt_delta from patch if exists
+                    patch_prompt_delta = learned_patch.get("prompt_delta", {}) or {}
+                    prompt_delta.update(patch_prompt_delta)
+            except Exception as e:
+                print(f"Error loading learned memory: {e}")
                 pass
         policy_key = f"run:{run_id}:policy"
         client.hset(policy_key, mapping=policy)

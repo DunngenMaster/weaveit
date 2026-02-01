@@ -3,6 +3,7 @@ from datetime import datetime, timezone
 from app.agent.graph import build_agent_graph
 from app.services.redis_client import redis_client
 from app.services.weaviate_client import weaviate_client
+import weaviate.classes as wvc
 
 
 def _write_trace_to_weaviate(run_id: str, tab_id: str, goal: str, query: str, status: str, trace: list[dict]):
@@ -42,6 +43,22 @@ def _write_run_memory(run_id: str, goal: str, query: str, summary: dict, policy:
         if summary:
             rec = summary.get("recommendation", {})
             summary_text = f"Top pick: {rec.get('name','')}. Reason: {rec.get('reason','')}"
+        
+        # Check if a RunMemory with this run_id already exists (from feedback)
+        # If it does and has a patch, don't overwrite it
+        try:
+            existing = collection.query.fetch_objects(
+                filters=wvc.query.Filter.by_property("run_id").equal(run_id),
+                limit=1
+            )
+            if existing.objects and existing.objects[0].properties.get("patch_json"):
+                existing_patch = json.loads(existing.objects[0].properties.get("patch_json", "{}"))
+                if existing_patch.get("policy_delta") or existing_patch.get("prompt_delta"):
+                    print(f"[RunMemory] Skipping write for {run_id} - already has feedback patch")
+                    return True
+        except Exception as check_error:
+            print(f"[RunMemory] Error checking existing: {check_error}")
+        
         collection.data.insert({
             "run_id": run_id,
             "goal": goal,
@@ -141,7 +158,18 @@ def run_agent(run_id: str, goal: str, query: str, limit: int, tab_id: str, url: 
         client.expire(f"run:{run_id}:events", 86400)
         
         _write_trace_to_weaviate(run_id, tab_id, goal, query, status, trace)
-        _write_run_memory(run_id, goal, query, summary, policy or {}, prompt_delta or {}, {}, metrics)
+        
+        # Retrieve patch if feedback was submitted
+        patch_from_redis = {}
+        patch_key = f"run:{run_id}:patch"
+        patch_data = client.hgetall(patch_key) or {}
+        if patch_data.get("patch"):
+            try:
+                patch_from_redis = json.loads(patch_data.get("patch", "{}"))
+            except Exception:
+                pass
+        
+        _write_run_memory(run_id, goal, query, summary, policy or {}, prompt_delta or {}, patch_from_redis, metrics)
         return True
     except Exception as e:
         run_key = f"run:{run_id}"
