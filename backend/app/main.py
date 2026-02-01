@@ -1,20 +1,21 @@
 from fastapi import FastAPI
 from contextlib import asynccontextmanager
-from app.api.routes import health
+from app.api.routes import health, events, context, memory
 from app.services.redis_client import redis_client
 from app.services.weaviate_client import weaviate_client
+from app.services.db_client import db_client
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Manage application lifespan"""
-    # Startup
     print("WeaveIt API starting up...")
+    db_client.connect()
+    weaviate_client.create_schema()
     yield
-    # Shutdown
     print("Shutting down...")
     redis_client.close()
     weaviate_client.close()
+    db_client.close()
 
 
 app = FastAPI(
@@ -26,6 +27,9 @@ app = FastAPI(
 
 # Include routers
 app.include_router(health.router, tags=["Health"])
+app.include_router(events.router, tags=["Events"])
+app.include_router(context.router, tags=["Context"])
+app.include_router(memory.router, tags=["Memory"])
 
 
 if __name__ == "__main__":
