@@ -276,6 +276,7 @@ def extract_node(state: Dict[str, Any]) -> Dict[str, Any]:
     fields = plan.get("extraction_fields") or []
     candidates = state.get("candidate_links") or []
     connect_url = state.get("connect_url")
+    live_view_url = state.get("live_view_url")
     policy = state.get("policy") or {}
     limit = min(len(candidates), int(policy.get("max_tabs", state.get("limit", 5))))
     
@@ -299,9 +300,38 @@ def extract_node(state: Dict[str, Any]) -> Dict[str, Any]:
     
     extracted_items: list[dict] = []
     
+    def _ensure_session():
+        nonlocal connect_url, live_view_url
+        if connect_url:
+            return True
+        session_result = browserbase_client.create_session(state.get("tab_id") or "agent")
+        if session_result.get("ok"):
+            session_data = session_result.get("data", {}) or {}
+            connect_url = session_data.get("connectUrl")
+            live_view_url = session_data.get("liveViewUrl") or session_data.get("live_view_url")
+            return True
+        return False
+    
+    if not _ensure_session():
+        trace.append({"type": "extract", "payload": {"status": "error", "error": "missing_connect_url"}})
+        if run_id:
+            client.rpush(
+                f"run:{run_id}:events",
+                json.dumps({"type": "extract_error", "payload": {"error": "missing_connect_url"}})
+            )
+            client.expire(f"run:{run_id}:events", 86400)
+        return {"trace": trace, "extracted_items": [], "connect_url": connect_url, "live_view_url": live_view_url}
+    
     try:
         with sync_playwright() as p:
-            browser = p.chromium.connect_over_cdp(connect_url)
+            try:
+                browser = p.chromium.connect_over_cdp(connect_url)
+            except Exception:
+                # Session may have expired; create a fresh one and retry once
+                connect_url = None
+                if not _ensure_session():
+                    raise
+                browser = p.chromium.connect_over_cdp(connect_url)
             context = browser.contexts[0] if browser.contexts else browser.new_context()
             page = context.new_page()
             
@@ -364,7 +394,7 @@ def extract_node(state: Dict[str, Any]) -> Dict[str, Any]:
                 json.dumps({"type": "extract_error", "payload": {"error": str(e)}})
             )
             client.expire(f"run:{run_id}:events", 86400)
-        return {"trace": trace, "extracted_items": []}
+        return {"trace": trace, "extracted_items": [], "connect_url": connect_url, "live_view_url": live_view_url}
     
     trace.append({
         "type": "extract",
@@ -376,7 +406,7 @@ def extract_node(state: Dict[str, Any]) -> Dict[str, Any]:
             json.dumps({"type": "extract_summary", "payload": {"count": len(extracted_items)}})
         )
         client.expire(f"run:{run_id}:events", 86400)
-    return {"trace": trace, "extracted_items": extracted_items}
+    return {"trace": trace, "extracted_items": extracted_items, "connect_url": connect_url, "live_view_url": live_view_url}
 
 
 def score_links_node(state: Dict[str, Any]) -> Dict[str, Any]:

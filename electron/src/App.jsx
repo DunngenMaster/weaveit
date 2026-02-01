@@ -34,6 +34,7 @@ export default function App() {
   const [runDetailsError, setRunDetailsError] = useState("");
   const [runEvents, setRunEvents] = useState([]);
   const eventsRef = useRef(null);
+  const openedUrlsRef = useRef(new Set());
   const [feedbackTags, setFeedbackTags] = useState([]);
   const [feedbackNotes, setFeedbackNotes] = useState("");
   const [previousRun, setPreviousRun] = useState(null);
@@ -268,6 +269,7 @@ export default function App() {
     setRunDetails(null);
     setRunDetailsError("");
     setRunEvents([]);
+    openedUrlsRef.current = new Set();
     if (eventsRef.current) {
       eventsRef.current.close();
       eventsRef.current = null;
@@ -346,6 +348,27 @@ export default function App() {
       try {
         const payload = JSON.parse(event.data);
         setRunEvents((prev) => [payload, ...prev].slice(0, 50));
+        // Mirror agent actions into the Ghost Browser tab
+        const ghostTabs = window.ghost?.tabs;
+        if (ghostTabs && payload?.type === "search_started") {
+          const q = payload?.payload?.query || "";
+          if (q && activeTabId) {
+            const searchUrl = `https://www.google.com/search?q=${encodeURIComponent(q)}`;
+            ghostTabs.navigate(activeTabId, searchUrl);
+          }
+        }
+        if (ghostTabs && payload?.type === "open") {
+          const url = payload?.payload?.url;
+          if (url && !openedUrlsRef.current.has(url)) {
+            openedUrlsRef.current.add(url);
+            const id = crypto.randomUUID();
+            setTabs((prev) => [...prev, { id, url, title: "Agent Tab", favicon: "" }]);
+            setTabLogs((prev) => ({ ...prev, [id]: [] }));
+            setTabRuns((prev) => ({ ...prev, [id]: [] }));
+            ghostTabs.create(id, url);
+            ghostTabs.navigate(id, url);
+          }
+        }
       } catch (error) {
         // ignore
       }
