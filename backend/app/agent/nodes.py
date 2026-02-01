@@ -173,8 +173,17 @@ def browse_node(state: Dict[str, Any]) -> Dict[str, Any]:
                     json.dumps({"type": "search_started", "payload": {"query": query}})
                 )
                 client.expire(f"run:{run_id}:events", 86400)
-            page.goto(search_url, wait_until="domcontentloaded", timeout=30000)
-            page.wait_for_timeout(1500)
+            try:
+                page.goto(search_url, wait_until="domcontentloaded", timeout=30000)
+                page.wait_for_timeout(1500)
+            except Exception:
+                # fallback to DuckDuckGo HTML if Google blocks
+                page.goto(f"https://duckduckgo.com/html/?q={query.replace(' ', '+')}", wait_until="domcontentloaded", timeout=30000)
+                page.wait_for_timeout(1500)
+            
+            if "google.com/sorry" in page.url:
+                page.goto(f"https://duckduckgo.com/html/?q={query.replace(' ', '+')}", wait_until="domcontentloaded", timeout=30000)
+                page.wait_for_timeout(1500)
             
             # Handle Google consent if present
             try:
@@ -188,16 +197,28 @@ def browse_node(state: Dict[str, Any]) -> Dict[str, Any]:
             raw_links = page.evaluate(
                 """() => {
                     const results = [];
-                    const blocks = document.querySelectorAll('div#search a h3');
-                    blocks.forEach(h3 => {
-                        const a = h3.closest('a');
-                        if (!a) return;
-                        results.push({
-                            href: a.href || '',
-                            text: (h3.innerText || '').trim()
+                    if (document.querySelector('div#search')) {
+                        const blocks = document.querySelectorAll('div#search a h3');
+                        blocks.forEach(h3 => {
+                            const a = h3.closest('a');
+                            if (!a) return;
+                            results.push({
+                                href: a.href || '',
+                                text: (h3.innerText || '').trim()
+                            });
                         });
-                    });
-                    if (results.length) return results;
+                        if (results.length) return results;
+                    }
+                    const ddg = document.querySelectorAll('a.result__a');
+                    if (ddg.length) {
+                        ddg.forEach(a => {
+                            results.push({
+                                href: a.href || '',
+                                text: (a.innerText || '').trim()
+                            });
+                        });
+                        return results;
+                    }
                     const links = Array.from(document.querySelectorAll('a'));
                     return links.map(a => ({
                         href: a.href || '',
@@ -350,9 +371,7 @@ def extract_node(state: Dict[str, Any]) -> Dict[str, Any]:
                     page.wait_for_timeout(1200)
                     title = page.title() or item.get("title", "")
                     content = page.evaluate(
-                        """() => (document.body && document.body.innerText)
-                            ? document.body.innerText.slice(0, 6000)
-                            : """""
+                        "() => (document.body && document.body.innerText) ? document.body.innerText.slice(0, 6000) : ''"
                     )
                     
                     message = prompt.format(

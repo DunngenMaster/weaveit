@@ -44,8 +44,8 @@ Items:
 
 SUMMARY_PROMPT = """You are a product analyst. Using the extracted items, pick the top 3 and recommend 1.
 Return a JSON object with:
-- top_three: list of 3 items with fields {name, price, reasons}
-- recommendation: {name, reason}
+- top_three: list of 3 items with fields {{name, price, reasons}}
+- recommendation: {{name, reason}}
 - table: list of rows (dict) for comparison with the extraction fields
 
 User goal: {goal}

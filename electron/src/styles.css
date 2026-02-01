@@ -567,6 +567,31 @@ body {
   align-items: center;
 }
 
+.before-after {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.before-after__card {
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 8px;
+  background: #ffffff;
+}
+
+.before-after__label {
+  font-size: 11px;
+  color: #6b7280;
+}
+
+.before-after__value {
+  font-size: 12px;
+  font-weight: 600;
+  color: #111827;
+}
+
 @media (max-width: 960px) {
   .viewport {
     grid-template-columns: 1fr;

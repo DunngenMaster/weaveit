@@ -39,6 +39,7 @@ export default function App() {
   const [feedbackTags, setFeedbackTags] = useState([]);
   const [feedbackNotes, setFeedbackNotes] = useState("");
   const [previousRun, setPreviousRun] = useState(null);
+  const hasMetrics = (metrics) => metrics && Object.keys(metrics).length > 0;
   const [tabRuns, setTabRuns] = useState(() => ({
     [tabs[0].id]: [],
   }));
@@ -279,6 +280,9 @@ export default function App() {
     setRunStatus("Starting...");
     setRunError("");
     setIsRunning(true);
+    if (runDetails && hasMetrics(runDetails.metrics)) {
+      setPreviousRun(runDetails);
+    }
     setRunDetails(null);
     setRunDetailsError("");
     setRunEvents([]);
@@ -418,7 +422,7 @@ export default function App() {
   };
 
   const applyAndRerun = async () => {
-    if (runDetails) {
+    if (runDetails && hasMetrics(runDetails.metrics)) {
       setPreviousRun(runDetails);
     }
     await submitFeedback();
@@ -871,7 +875,9 @@ export default function App() {
                               {item.price || ""}
                             </div>
                             <div className="run-details__item-url">
-                              {item.reasons ? item.reasons.join(" • ") : ""}
+                              {Array.isArray(item.reasons)
+                                ? item.reasons.join(" • ")
+                                : (item.reasons || "")}
                             </div>
                           </li>
                         ))}
@@ -908,7 +914,7 @@ export default function App() {
                     </pre>
                   </div>
                 ) : null}
-                {runDetails.metrics && Object.keys(runDetails.metrics).length ? (
+                {hasMetrics(runDetails.metrics) ? (
                   <div className="run-details__block">
                     <div className="run-details__label">Run Metrics</div>
                     <pre className="run-details__code">
@@ -916,7 +922,7 @@ export default function App() {
                     </pre>
                   </div>
                 ) : null}
-                {previousRun && runDetails.metrics ? (
+                {previousRun && hasMetrics(previousRun.metrics) && hasMetrics(runDetails.metrics) ? (
                   <div className="run-details__block">
                     <div className="run-details__label">Before / After</div>
                     <pre className="run-details__code">
@@ -929,7 +935,30 @@ export default function App() {
   2
 )}
                     </pre>
+                    <div className="before-after">
+                      <div className="before-after__card">
+                        <div className="before-after__label">Tabs opened</div>
+                        <div className="before-after__value">
+                          {(previousRun.metrics?.tabs_opened ?? 0)} → {(runDetails.metrics?.tabs_opened ?? 0)}
+                        </div>
+                      </div>
+                      <div className="before-after__card">
+                        <div className="before-after__label">Candidates</div>
+                        <div className="before-after__value">
+                          {(previousRun.metrics?.candidates ?? 0)} → {(runDetails.metrics?.candidates ?? 0)}
+                        </div>
+                      </div>
+                      <div className="before-after__card">
+                        <div className="before-after__label">Extracted</div>
+                        <div className="before-after__value">
+                          {(previousRun.metrics?.extracted ?? 0)} → {(runDetails.metrics?.extracted ?? 0)}
+                        </div>
+                      </div>
+                    </div>
                   </div>
+                ) : null}
+                {previousRun && (!hasMetrics(runDetails.metrics) || runDetails.status === "started") ? (
+                  <p className="muted">Before/After will appear once the new run completes.</p>
                 ) : null}
               </div>
             ) : runDetailsError ? (

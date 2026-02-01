@@ -5,7 +5,6 @@ from app.schemas.feedback import FeedbackRequest, FeedbackResponse
 from app.agent.learn import generate_patch
 from app.services.weaviate_client import weaviate_client
 from app.services.redis_client import redis_client
-from app.services.weaviate_client import weaviate_client
 
 
 router = APIRouter()
@@ -66,30 +65,30 @@ async def submit_feedback(request: FeedbackRequest):
                     "ts": str(int(datetime.now().timestamp() * 1000))
                 })
                 client.expire(tab_patch_key, 86400)
-                print(f"[FEEDBACK] Patch generated and saved")
+                print("[FEEDBACK] Patch generated and saved")
+                
+                # Persist patch to Weaviate RunMemory for global recall
+                try:
+                    if weaviate_client.client.is_ready() and weaviate_client.client.collections.exists("RunMemory"):
+                        run_data = client.hgetall(trace_key) or {}
+                        collection = weaviate_client.client.collections.get("RunMemory")
+                        collection.data.insert({
+                            "run_id": request.run_id,
+                            "goal": run_data.get("goal", ""),
+                            "query": run_data.get("query", ""),
+                            "summary_text": "",
+                            "policy_json": run_data.get("policy_json", "{}"),
+                            "prompt_delta_json": run_data.get("prompt_delta", "{}"),
+                            "patch_json": json.dumps(patch),
+                            "metrics_json": run_data.get("metrics", "{}"),
+                            "created_at": datetime.now(timezone.utc)
+                        })
+                except Exception as e:
+                    print(f"[FEEDBACK] Error writing patch memory: {e}")
             except Exception as patch_error:
                 print(f"[FEEDBACK] Error generating patch: {patch_error}")
                 import traceback
                 traceback.print_exc()
-            
-            # Persist patch to Weaviate RunMemory for global recall
-            try:
-                if weaviate_client.client.is_ready() and weaviate_client.client.collections.exists("RunMemory"):
-                    run_data = client.hgetall(trace_key) or {}
-                    collection = weaviate_client.client.collections.get("RunMemory")
-                    collection.data.insert({
-                        "run_id": request.run_id,
-                        "goal": run_data.get("goal", ""),
-                        "query": run_data.get("query", ""),
-                        "summary_text": "",
-                        "policy_json": run_data.get("policy_json", "{}"),
-                        "prompt_delta_json": run_data.get("prompt_delta", "{}"),
-                        "patch_json": json.dumps(patch),
-                        "metrics_json": run_data.get("metrics", "{}"),
-                        "created_at": datetime.now(timezone.utc)
-                    })
-            except Exception as e:
-                print(f"Error writing patch memory: {e}")
         
         try:
             wclient = weaviate_client.client
