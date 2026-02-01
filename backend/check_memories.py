@@ -1,9 +1,12 @@
 import weaviate
 import weaviate.classes as wvc
+from app.core.config import get_settings
+
+settings = get_settings()
 
 c = weaviate.connect_to_weaviate_cloud(
-    cluster_url='https://a5loitqjsfm3mejfr6yfoq.c0.us-west3.gcp.weaviate.cloud',
-    auth_credentials=weaviate.auth.AuthApiKey('enJCekZ3UVM3Wk45ZnltRl85ZUh6RTRSNWtiMDFCZVJsT05Teld2RjRZdTg3MlpZYjVZc3o1c1JMQTFVPV92MjAw')
+    cluster_url=settings.weaviate_url,
+    auth_credentials=weaviate.auth.AuthApiKey(settings.weaviate_api_key)
 )
 
 col = c.collections.get('MemoryItem')
