@@ -15,6 +15,9 @@ from app.services.safety_gate import safety_gate
 from app.services.critic import critic
 from app.services.reward import reward_resolver
 
+# Sprint 15: New imports for Redis Streams
+USE_STREAMS = True  # Feature flag for gradual rollout
+
 
 router = APIRouter(prefix="/v1/events")
 
@@ -239,7 +242,23 @@ async def ingest_events(batch: EventBatch):
         
         # Second pass: store canonical events (only if allowed)
         for canonical in canonical_events:
-            # Store in Redis events list per user+provider
+            # Sprint 15.1: Write to Redis Streams (replayable, ordered)
+            if USE_STREAMS:
+                stream_key = f"stream:events:{canonical.user_id}"
+                
+                # Prepare event data for stream
+                stream_data = canonical.model_dump()
+                # Convert payload dict to JSON string for stream storage
+                stream_data['payload'] = json.dumps(stream_data['payload'])
+                
+                # XADD stream:events:{user_id} * <fields>
+                try:
+                    message_id = client.xadd(stream_key, stream_data, maxlen=1000)
+                    print(f"[STREAM] Added event {canonical.event_id[:8]}... to stream {message_id}")
+                except Exception as e:
+                    print(f"[STREAM] Error writing to stream: {e}")
+            
+            # Keep LPUSH for backward compatibility and debugging
             events_key = f"events:{canonical.user_id}:{canonical.provider}"
             canonical_json = canonical.model_dump_json()
             client.lpush(events_key, canonical_json)
