@@ -26,6 +26,7 @@ export default function App() {
   const [query, setQuery] = useState(
     "best noise cancelling headphones under 200"
   );
+  const [apiStatus, setApiStatus] = useState("Unknown");
   const [runStatus, setRunStatus] = useState("Idle");
   const [runId, setRunId] = useState("");
   const [runError, setRunError] = useState("");
@@ -42,10 +43,22 @@ export default function App() {
     [tabs[0].id]: [],
   }));
   const [learned, setLearned] = useState([]);
-  const apiBase = import.meta.env.VITE_API_BASE || "http://localhost:8000";
+  const apiBase = import.meta.env.VITE_API_BASE || "http://127.0.0.1:8000";
   const activeTab = tabs.find((tab) => tab.id === activeTabId);
   const viewportRef = useRef(null);
   const runPollRef = useRef(null);
+
+  useEffect(() => {
+    const checkApi = async () => {
+      try {
+        const response = await fetch(`${apiBase}/health`);
+        setApiStatus(response.ok ? "OK" : `Error: ${response.status}`);
+      } catch (error) {
+        setApiStatus(error?.message || "Error");
+      }
+    };
+    checkApi();
+  }, [apiBase]);
 
   const appendTabLog = (tabId, message) => {
     setTabLogs((prev) => {
@@ -589,6 +602,7 @@ export default function App() {
               {isRunning ? "Starting..." : "Start Run"}
             </button>
             <div className="run-status">
+              <div>API: {apiStatus}</div>
               <div>Status: {runStatus}</div>
               {runId ? <div>Run ID: {runId}</div> : null}
               {runError ? <div className="error">{runError}</div> : null}

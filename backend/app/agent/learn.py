@@ -13,18 +13,29 @@ class LearnOutput(BaseModel):
 
 
 def generate_patch(trace: list, feedback: dict) -> dict:
-    llm = get_chat_model()
-    parser = JsonOutputParser(pydantic_object=LearnOutput)
-    prompt = PromptTemplate(
-        template=LEARNER_PROMPT,
-        input_variables=["trace", "feedback"],
-        partial_variables={"format_instructions": parser.get_format_instructions()},
-    )
-    message = prompt.format(
-        trace=json.dumps(trace)[:12000],
-        feedback=json.dumps(feedback)[:4000]
-    )
-    response = llm.invoke(message)
-    text = response.content if hasattr(response, "content") else str(response)
-    patch = parser.parse(text)
-    return patch if isinstance(patch, dict) else patch.model_dump()
+    try:
+        llm = get_chat_model()
+        parser = JsonOutputParser(pydantic_object=LearnOutput)
+        prompt = PromptTemplate(
+            template=LEARNER_PROMPT,
+            input_variables=["trace", "feedback"],
+            partial_variables={"format_instructions": parser.get_format_instructions()},
+        )
+        message = prompt.format(
+            trace=json.dumps(trace)[:12000],
+            feedback=json.dumps(feedback)[:4000]
+        )
+        response = llm.invoke(message)
+        text = response.content if hasattr(response, "content") else str(response)
+        patch = parser.parse(text)
+        return patch if isinstance(patch, dict) else patch.model_dump()
+    except Exception as e:
+        print(f"[LEARN] Patch generation failed: {e}")
+        import traceback
+        traceback.print_exc()
+        # Return empty patch instead of crashing
+        return {
+            "policy_delta": {},
+            "prompt_delta": {},
+            "rationale": f"Error generating patch: {str(e)}"
+        }
