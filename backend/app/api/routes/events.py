@@ -20,6 +20,25 @@ def compute_fingerprint(text: str) -> str:
     return hashlib.sha256(normalized.encode()).hexdigest()
 
 
+def is_sensitive_url(url: str | None) -> bool:
+    """Check if URL contains sensitive domains that should not be ingested"""
+    if not url:
+        return False
+    
+    url_lower = url.lower()
+    sensitive_patterns = [
+        "mail.google.com",
+        "bank",
+        "myaccount.google.com",
+        "paypal",
+        "chase",
+        "wellsfargo",
+        "health"
+    ]
+    
+    return any(pattern in url_lower for pattern in sensitive_patterns)
+
+
 def write_memory_to_weaviate(user_id: str, candidate: dict):
     try:
         client = weaviate_client.client
@@ -60,6 +79,10 @@ async def ingest_events(batch: EventBatch):
         ingested_count = 0
         
         for event in batch.events:
+            # Block sensitive URLs
+            if is_sensitive_url(event.url):
+                return {"ignored": True, "reason": "SENSITIVE_URL"}
+            
             session_id = event.session_id
             user_id = event.user_id
             
