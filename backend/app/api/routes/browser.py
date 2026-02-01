@@ -34,6 +34,7 @@ async def start_browser_session(request: BrowserSessionStartRequest):
         )
     
     session_id = result.get("session_id")
+    connect_url = result.get("data", {}).get("connectUrl", "")
     
     # Store mapping in Redis with 24h TTL
     client = redis_client.client
@@ -58,6 +59,8 @@ async def start_browser_session(request: BrowserSessionStartRequest):
     
     return BrowserSessionStartResponse(
         session_id=session_id,
+        user_id=request.user_id,
+        connect_url=connect_url,
         status="created"
     )
 

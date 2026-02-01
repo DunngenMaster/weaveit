@@ -11,6 +11,8 @@ class BrowserSessionStartResponse(BaseModel):
     """Response for POST /v1/browser/session/start"""
     
     session_id: str = Field(..., description="Browserbase session ID")
+    user_id: str = Field(..., description="User identifier")
+    connect_url: str = Field(..., description="WebSocket URL to connect to the session")
     status: str = Field(..., description="Session status")
 
 
