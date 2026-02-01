@@ -68,3 +68,16 @@ dump.rdb
 *.tmp
 *.bak
 *.cache
+
+# Node / Electron
+node_modules/
+electron/node_modules/
+electron/dist/
+electron/out/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+electron/.vite/
+electron/node_modules/
+electron/node_modules/
