@@ -172,6 +172,33 @@ async def get_learned(tab_id: str):
         )
 
 
+@router.delete("/tabs/{tab_id}/visited")
+async def clear_visited_urls(tab_id: str):
+    """
+    Clear the visited URLs history for a tab to allow showing previous results again.
+    """
+    try:
+        client = redis_client.get_client()
+        if not client:
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="Redis connection unavailable"
+            )
+        
+        visited_urls_key = f"tab:{tab_id}:visited_urls"
+        count = client.delete(visited_urls_key)
+        
+        return {"ok": True, "cleared": count > 0}
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to clear visited URLs: {str(e)}"
+        )
+
+
 @router.get("/runs/{run_id}", response_model=RunDetailsResponse)
 async def get_run_details(run_id: str):
     try:

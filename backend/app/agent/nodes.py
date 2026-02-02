@@ -419,6 +419,7 @@ def score_links_node(state: Dict[str, Any]) -> Dict[str, Any]:
     query = state.get("query", "")
     goal = state.get("goal", "")
     policy = state.get("policy") or {}
+    prompt_delta = state.get("prompt_delta") or {}
     limit = int(policy.get("max_tabs", state.get("limit", 5)))
     min_score = float(policy.get("min_score", 0.0))
     unique_domains = int(policy.get("unique_domains", 1))
@@ -437,7 +438,7 @@ def score_links_node(state: Dict[str, Any]) -> Dict[str, Any]:
     parser = JsonOutputParser(pydantic_object=LinkScoreOutput)
     prompt = PromptTemplate(
         template=LINK_SCORER_PROMPT,
-        input_variables=["goal", "query", "required_sources", "items"],
+        input_variables=["goal", "query", "required_sources", "items", "prompt_delta"],
         partial_variables={"format_instructions": parser.get_format_instructions()},
     )
     items = "\n".join(
@@ -447,7 +448,8 @@ def score_links_node(state: Dict[str, Any]) -> Dict[str, Any]:
         goal=goal,
         query=query,
         required_sources=", ".join(required_sources),
-        items=items
+        items=items,
+        prompt_delta=json.dumps(prompt_delta) if prompt_delta else "none"
     )
     response = llm.invoke(message)
     text = response.content if hasattr(response, "content") else str(response)

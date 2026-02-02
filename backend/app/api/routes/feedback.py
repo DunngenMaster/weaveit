@@ -51,24 +51,55 @@ async def submit_feedback(request: FeedbackRequest):
         
         if trace:
             try:
-                print(f"[FEEDBACK] Generating patch for run {request.run_id}")
-                patch = generate_patch(trace, feedback)
+                print(f"[FEEDBACK] ========== GENERATING PATCH ==========")
+                print(f"[FEEDBACK] Run ID: {request.run_id}")
+                print(f"[FEEDBACK] Tab ID: {request.tab_id}")
+                print(f"[FEEDBACK] Tags: {request.tags}")
+                print(f"[FEEDBACK] Notes: {request.notes}")
+                print(f"[FEEDBACK] Trace length: {len(trace)} events")
+                
+                # Generate patch with retry logic
+                patch = generate_patch(trace, feedback, max_retries=3)
+                
+                # Validate patch structure
+                if not isinstance(patch, dict):
+                    raise ValueError(f"Invalid patch type: {type(patch)}")
+                
+                if "policy_delta" not in patch or "prompt_delta" not in patch or "rationale" not in patch:
+                    raise ValueError(f"Patch missing required fields: {patch.keys()}")
+                
+                print(f"[FEEDBACK] ========== PATCH GENERATED ==========")
+                print(f"[FEEDBACK] policy_delta: {json.dumps(patch.get('policy_delta'), indent=2)}")
+                print(f"[FEEDBACK] prompt_delta: {json.dumps(patch.get('prompt_delta'), indent=2)}")
+                print(f"[FEEDBACK] rationale: {patch.get('rationale')}")
+                
+                # Save to Redis
+                patch_json = json.dumps(patch)
+                timestamp = str(int(datetime.now().timestamp() * 1000))
+                
                 patch_key = f"run:{request.run_id}:patch"
-                client.hset(patch_key, mapping={
-                    "patch": json.dumps(patch),
-                    "ts": str(int(datetime.now().timestamp() * 1000))
-                })
+                client.hset(patch_key, mapping={"patch": patch_json, "ts": timestamp})
                 client.expire(patch_key, 86400)
+                print(f"[FEEDBACK] ✓ Saved to {patch_key}")
                 
                 tab_patch_key = f"tab:{request.tab_id}:patch"
-                client.hset(tab_patch_key, mapping={
-                    "patch": json.dumps(patch),
-                    "ts": str(int(datetime.now().timestamp() * 1000))
-                })
+                client.hset(tab_patch_key, mapping={"patch": patch_json, "ts": timestamp})
                 client.expire(tab_patch_key, 86400)
-                print(f"[FEEDBACK] Patch generated and saved")
+                print(f"[FEEDBACK] ✓ Saved to {tab_patch_key}")
+                
+                # Verify save
+                verification = client.hgetall(tab_patch_key)
+                if verification and verification.get("patch"):
+                    saved_patch = json.loads(verification.get("patch"))
+                    print(f"[FEEDBACK] ✓ Verified: {saved_patch.get('policy_delta')}")
+                else:
+                    raise ValueError("Patch verification failed")
+                
+                print(f"[FEEDBACK] ========== SUCCESS ==========")
+                
             except Exception as patch_error:
-                print(f"[FEEDBACK] Error generating patch: {patch_error}")
+                print(f"[FEEDBACK] ========== ERROR ==========")
+                print(f"[FEEDBACK] {patch_error}")
                 import traceback
                 traceback.print_exc()
             

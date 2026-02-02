@@ -518,7 +518,17 @@ else:
                 yaxis_title="Run",
                 showlegend=True,
                 paper_bgcolor='white',
-                plot_bgcolor='#f9fafb'
+                plot_bgcolor='#f9fafb',
+                font=dict(color='#1e293b', size=12),
+                title_font=dict(color='#1e293b'),
+                xaxis=dict(
+                    title=dict(font=dict(color='#1e293b')),
+                    tickfont=dict(color='#1e293b')
+                ),
+                yaxis=dict(
+                    title=dict(font=dict(color='#1e293b')),
+                    tickfont=dict(color='#1e293b')
+                )
             )
             st.plotly_chart(fig, use_container_width=True)
 
@@ -600,7 +610,11 @@ if policy_history:
         fig.update_layout(
             height=300,
             paper_bgcolor='white',
-            plot_bgcolor='#f9fafb'
+            plot_bgcolor='#f9fafb',
+            font=dict(color='#1e293b'),
+            title_font=dict(color='#1e293b'),
+            xaxis=dict(color='#1e293b'),
+            yaxis=dict(color='#1e293b')
         )
         st.plotly_chart(fig, use_container_width=True)
     
@@ -615,7 +629,11 @@ if policy_history:
         fig.update_layout(
             height=300,
             paper_bgcolor='white',
-            plot_bgcolor='#f9fafb'
+            plot_bgcolor='#f9fafb',
+            font=dict(color='#1e293b'),
+            title_font=dict(color='#1e293b'),
+            xaxis=dict(color='#1e293b'),
+            yaxis=dict(color='#1e293b')
         )
         st.plotly_chart(fig, use_container_width=True)
 else:
@@ -644,7 +662,10 @@ if weaviate_stats.get('connected'):
         height=300,
         showlegend=False,
         paper_bgcolor='white',
-        plot_bgcolor='#f9fafb'
+        plot_bgcolor='#f9fafb',
+        font=dict(color='#1e293b'),
+        xaxis=dict(color='#1e293b'),
+        yaxis=dict(color='#1e293b')
     )
     st.plotly_chart(fig, use_container_width=True)
 
